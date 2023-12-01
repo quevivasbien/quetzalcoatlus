@@ -23,6 +23,10 @@ public:
         return Bounds(Pt3(FLT_MAX, FLT_MAX, FLT_MAX), Pt3(FLT_MIN, FLT_MIN, FLT_MIN));
     }
 
+    static Bounds infinite() {
+        return Bounds(Pt3(-FLT_MAX, -FLT_MAX, -FLT_MAX), Pt3(FLT_MAX, FLT_MAX, FLT_MAX));
+    }
+
     Bounds union_with(const Bounds &b) {
         return Bounds(
             Pt3(fminf(min.x, b.min.x), fminf(min.y, b.min.y), fminf(min.z, b.min.z)),

@@ -84,9 +84,10 @@ void render_pixels(
         color /= float(n_samples);
         color.map([gamma](float c) { return powf(c, 1.0f / gamma); });
 
-        buffer[i * 3 + 0] = color.x;
+        // put values in backward, since opencv uses BGR color format
+        buffer[i * 3 + 0] = color.z;
         buffer[i * 3 + 1] = color.y;
-        buffer[i * 3 + 2] = color.z;
+        buffer[i * 3 + 2] = color.x;
     }
 
     {
@@ -161,32 +162,42 @@ std::vector<float> render(
 
 
 int main() {
-    ShapePrimitive lambert_sphere(
-        Sphere(Pt3(-1.5f, 0.0f, -3.0f), 0.7f),
-        LambertMaterial<SolidColor>(Vec3(0.8f, 0.3f, 0.3f))
+    ShapePrimitive light(
+        Quad(Pt3(-1.0, 1.99, -4.0), Vec3(0.0, 0.0, -2.0), Vec3(2.0, 0.0, 0.0)),
+        EmissiveMaterial<SolidColor>(Vec3(4.0, 4.0, 4.0))
+    );
+    ShapePrimitive ceiling(
+        Quad(Pt3(-2.0, 2.0, -3.0), Vec3(0.0, 0.0, -4.0), Vec3(4.0, 0.0, 0.0)),
+        LambertMaterial<SolidColor>(Vec3(0.8f, 0.8f, 0.2f))
+    );
+    ShapePrimitive floor(
+        Quad(Pt3(-2.0, -2.0, -3.0), Vec3(4.0, 0.0, 0.0), Vec3(0.0, 0.0, -4.0)),
+        LambertMaterial<SolidColor>(Vec3(0.3f, 0.8f, 0.8f))
+    );
+    ShapePrimitive left_wall(
+        Quad(Pt3(-2.0, -2.0, -3.0), Vec3(0.0, 0.0, -4.0), Vec3(0.0, 4.0, 0.0)),
+        LambertMaterial<SolidColor>(Vec3(1.0f, 0.2f, 0.2f))
+    );
+    ShapePrimitive right_wall(
+        Quad(Pt3(2.0, -2.0, -3.0), Vec3(0.0, 4.0, 0.0), Vec3(0.0, 0.0, -4.0)),
+        LambertMaterial<SolidColor>(Vec3(0.3f, 0.3f, 0.8f))
+    );
+    ShapePrimitive back_wall(
+        Quad(Pt3(-2.0, -2.0, -7.0), Vec3(4.0, 0.0, 0.0), Vec3(0.0, 4.0, 0.0)),
+        LambertMaterial<SolidColor>(Vec3(0.2f, 0.8f, 0.2f))
     );
 
     ShapePrimitive specular_sphere(
-        Sphere(Pt3(1.5f, 0.0f, -3.0f), 0.7f),
-        SpecularMaterial<SolidColor>(Vec3(0.3f, 0.6f, 0.8f), 0.2f)
+        Sphere(Pt3(0.0f, -1.0f, -5.0f), 1.0),
+        SpecularMaterial<SolidColor>(Vec3(0.3f, 0.6f, 0.8f), 0.1f)
     );
 
-    ShapePrimitive refractive_sphere(
-        Sphere(Pt3(0.0f, 0.0f, -3.0f), 0.7f),
-        RefractiveMaterial<SolidColor>(Vec3(0.9f, 0.95f, 1.0f), 1.2f)
-    );
-
-    ShapePrimitive emissive_sphere(
-        Sphere(Pt3(0.0f, 5.0f, 5.0f), 7.0f),
-        EmissiveMaterial<SolidColor>(Vec3(4.0f, 4.0f, 4.0f))
-    );
-
-    Aggregate world({&lambert_sphere, &specular_sphere, &refractive_sphere, &emissive_sphere});
+    Aggregate world({&light, &ceiling, &floor, &left_wall, &right_wall, &back_wall, &specular_sphere});
 
     Camera camera(
-        800, 450, M_PI / 3.0f
+        800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 144;
+    size_t n_samples = 64;
     size_t max_bounces = 16;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
