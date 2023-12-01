@@ -62,13 +62,18 @@ void render_pixels(
     size_t& global_index,
     std::mutex& mutex
 ) {
+    uint32_t stratum_width = sqrtl(n_samples);
     for (size_t i = start_index; i < end_index; i++) {
-        Sampler sampler(static_cast<uint32_t>(i));
+        Sampler sampler(
+            static_cast<uint32_t>(i),
+            stratum_width
+        );
         size_t x = i % camera.image_width;
         size_t y = i / camera.image_width;
 
         Vec3 color(0., 0., 0.);
         for (size_t s = 0; s < n_samples; s++) {
+            sampler.set_sample_index(s);
             auto jitter = sampler.sample_2d();
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
