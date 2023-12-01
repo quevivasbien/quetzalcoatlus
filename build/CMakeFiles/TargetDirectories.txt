@@ -1,3 +1,0 @@
-/home/ema/Documents/code/dinosaur/build/CMakeFiles/main.dir
-/home/ema/Documents/code/dinosaur/build/CMakeFiles/edit_cache.dir
-/home/ema/Documents/code/dinosaur/build/CMakeFiles/rebuild_cache.dir

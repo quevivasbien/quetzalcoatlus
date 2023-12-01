@@ -6,8 +6,8 @@
 class Camera {
 public:
     Camera(
-        float image_width,
-        int image_height,
+        size_t image_width,
+        size_t image_height,
         float fov
     ) : image_width(image_width), image_height(image_height) {
         float viewport_height = 2.0f * tanf(fov * 0.5f);
@@ -35,8 +35,8 @@ public:
         );
     }
 
-    int image_height;
-    int image_width;
+    size_t image_height;
+    size_t image_width;
     Pt3 pos;
     Vec3 up;
     Vec3 right;
