@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstddef>
+#include <cmath>
+
 #include "vec.hpp"
 #include "ray.hpp"
 

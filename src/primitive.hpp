@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <memory>
 
 #include "bounds.hpp"
 #include "interval.hpp"
@@ -26,6 +27,38 @@ public:
         return Bounds::empty();
     }
 };
+
+
+class Aggregate : public Primitive {
+public:
+    explicit Aggregate(std::vector<Primitive*>&& primitives) : primitives(primitives) {
+        for (const auto p : this->primitives) {
+            std::cout << "bounds_max: " << p->bounds().max.x << " " << p->bounds().max.y << " " << p->bounds().max.z << std::endl;
+            std::cout << "bounds_min: " << p->bounds().min.x << " " << p->bounds().min.y << " " << p->bounds().min.z << std::endl;
+            m_bounds = m_bounds.union_with(p->bounds());
+        }
+    }
+
+    std::optional<Intersection> intersect(const Ray& ray, Interval t) const override {
+        std::optional<Intersection> isect = std::nullopt;
+        for (const auto p : primitives) {
+            std::optional<Intersection> i = p->intersect(ray, t);
+            if (i) {
+                isect.emplace(*i);
+                t.high = isect->t;
+            }
+        }
+        return isect;
+    }
+
+    Bounds bounds() const override {
+        return m_bounds;
+    }
+
+    std::vector<Primitive*> primitives;
+    Bounds m_bounds = Bounds::empty();
+};
+
 
 
 template <typename S, typename M>

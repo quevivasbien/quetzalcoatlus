@@ -18,6 +18,7 @@ struct ShapeIntersection {
 };
 
 class Shape {
+public:
     virtual std::optional<ShapeIntersection> intersect(const Ray& ray, Interval t) const = 0;
     virtual Bounds bounds() const = 0;
 };

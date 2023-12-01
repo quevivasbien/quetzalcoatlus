@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <thread>
 #include <vector>
 #include <opencv2/opencv.hpp>
@@ -160,12 +161,17 @@ std::vector<float> render(
 
 
 int main() {
-    Sphere s(Pt3(0.0f, 0.0f, -2.0f), 0.5f);
-    LambertMaterial<SolidColor> mat(Vec3(0.8f, 0.3f, 0.3f));
-
-    ShapePrimitive<Sphere, LambertMaterial<SolidColor>> sphere(
-        s, mat
+    ShapePrimitive lambert_sphere(
+        Sphere(Pt3(-1.0f, 0.0f, -3.0f), 0.75f),
+        LambertMaterial<SolidColor>(Vec3(0.8f, 0.3f, 0.3f))
     );
+
+    ShapePrimitive specular_sphere(
+        Sphere(Pt3(1.0f, 0.0f, -3.0f), 0.75f),
+        SpecularMaterial<SolidColor>(Vec3(0.8f, 0.3f, 0.3f), 0.2f)
+    );
+
+    Aggregate world({&lambert_sphere, &specular_sphere});
 
     Camera camera(
         800, 600, M_PI / 3.0f
@@ -179,7 +185,7 @@ int main() {
     auto start_time = std::chrono::steady_clock::now();
     auto pixels = render(
         camera,
-        sphere,
+        world,
         n_samples, max_bounces, 0.43
     );
     auto end_time = std::chrono::steady_clock::now();

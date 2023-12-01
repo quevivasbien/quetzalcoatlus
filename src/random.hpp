@@ -5,7 +5,7 @@
 #include "vec.hpp"
 
 
-inline uint32_t permutation_element(uint32_t i, uint32_t l, uint32_t p) {
+uint32_t permutation_element(uint32_t i, uint32_t l, uint32_t p) {
     uint32_t w = l - 1;
     w |= w >> 1;
     w |= w >> 2;
