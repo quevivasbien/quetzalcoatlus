@@ -9,6 +9,9 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 add_library(lib
+    src/random.cpp
+    src/shape.cpp
+    src/texture.cpp
     src/vec.cpp
 )
 target_link_libraries(lib ${OpenCV_LIBS})

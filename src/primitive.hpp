@@ -1,7 +1,6 @@
 #pragma once
 
 #include <optional>
-#include <memory>
 
 #include "bounds.hpp"
 #include "interval.hpp"
@@ -33,8 +32,6 @@ class Aggregate : public Primitive {
 public:
     explicit Aggregate(std::vector<Primitive*>&& primitives) : primitives(primitives) {
         for (const auto p : this->primitives) {
-            std::cout << "bounds_max: " << p->bounds().max.x << " " << p->bounds().max.y << " " << p->bounds().max.z << std::endl;
-            std::cout << "bounds_min: " << p->bounds().min.x << " " << p->bounds().min.y << " " << p->bounds().min.z << std::endl;
             m_bounds = m_bounds.union_with(p->bounds());
         }
     }

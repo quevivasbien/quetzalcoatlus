@@ -118,7 +118,7 @@ public:
     float ior;
 
 private:
-    float reflectance(float cos_theta, float ior_ratio) {
+    float reflectance(float cos_theta, float ior_ratio) const {
         float r0 = (1.0f - ior_ratio) / (1.0f + ior_ratio);
         r0 = r0 * r0;
         return r0 + (1.0f - r0) * powf(1.0f - cos_theta, 5.0f);

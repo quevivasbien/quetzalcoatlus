@@ -143,3 +143,48 @@ Pt3& Pt3::operator-=(const Vec3 &v2) {
     z -= v2.z;
     return *this;
 }
+
+
+Vec2 Vec2::operator-() const {
+    return Vec2(-x, -y);
+}
+
+Vec2 Vec2::operator+(const Vec2 &v2) const {
+    return Vec2(x + v2.x, y + v2.y);
+}
+Vec2& Vec2::operator+=(const Vec2 &v2) {
+    x += v2.x;
+    y += v2.y;
+    return *this;
+}
+
+Vec2 Vec2::operator-(const Vec2 &v2) const {
+    return Vec2(x - v2.x, y - v2.y);
+}
+Vec2& Vec2::operator-=(const Vec2 &v2) {
+    x -= v2.x;
+    y -= v2.y;
+    return *this;
+}
+
+Vec2 Vec2::operator*(float t) const {
+    return Vec2(x * t, y * t);
+}
+Vec2& Vec2::operator*=(float t) {
+    x *= t;
+    y *= t;
+    return *this;
+}
+
+Vec2 Vec2::operator/(float t) const {
+    return Vec2(x / t, y / t);
+}
+Vec2& Vec2::operator/=(float t) {
+    x /= t;
+    y /= t;
+    return *this;
+}
+
+Vec2 operator*(float t, const Vec2& v) {
+    return v * t;
+}

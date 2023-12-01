@@ -1,6 +1,5 @@
 #pragma once
 
-
 class Vec3 {
 public:
     Vec3() : x(0), y(0), z(0) {}
@@ -95,43 +94,19 @@ public:
 
     Vec2(float x, float y) : x(x), y(y) {}
 
-    Vec2 operator-() const {
-        return Vec2(-x, -y);
-    }
+    Vec2 operator-() const;
 
-    Vec2 operator+(const Vec2 &v2) const {
-        return Vec2(x + v2.x, y + v2.y);
-    }
-    Vec2& operator+=(const Vec2 &v2) {
-        x += v2.x;
-        y += v2.y;
-        return *this;
-    }
+    Vec2 operator+(const Vec2 &v2) const;
+    Vec2& operator+=(const Vec2 &v2);
 
-    Vec2 operator-(const Vec2 &v2) const {
-        return Vec2(x - v2.x, y - v2.y);
-    }
-    Vec2& operator-=(const Vec2 &v2) {
-        x -= v2.x;
-        y -= v2.y;
-        return *this;
-    }
+    Vec2 operator-(const Vec2 &v2) const;
+    Vec2& operator-=(const Vec2 &v2);
 
-    Vec2 operator*(float t) const {
-        return Vec2(x * t, y * t);
-    }
-    Vec2& operator*=(float t) {
-        x *= t;
-        y *= t;
-        return *this;
-    }
+    Vec2 operator*(float t) const;
+    Vec2& operator*=(float t);
 
-    Vec2 operator/(float t) const {
-        return Vec2(x / t, y / t);
-    }
-    Vec2& operator/=(float t) {
-        x /= t;
-        y /= t;
-        return *this;
-    }
+    Vec2 operator/(float t) const;
+    Vec2& operator/=(float t);
 };
+
+Vec2 operator*(float t, const Vec2 &v);

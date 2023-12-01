@@ -39,12 +39,12 @@ Vec3 pixel_color(
             }
         }
         else {
-            // Show sky color
-            Vec3 unit_direction = current_ray.d.normalize();
-            float t = 0.5f * (unit_direction.y + 1.0f);
-            Vec3 c = (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);
-            return color * c;
-            // return Vec3(0.0f, 0.0f, 0.0f);
+            // // Show sky color
+            // Vec3 unit_direction = current_ray.d.normalize();
+            // float t = 0.5f * (unit_direction.y + 1.0f);
+            // Vec3 c = (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);
+            // return color * c;
+            return Vec3(0.0f, 0.0f, 0.0f);
         }
     }
 
@@ -70,7 +70,7 @@ void render_pixels(
             stratum_width
         );
         size_t x = i % camera.image_width;
-        size_t y = i / camera.image_width;
+        size_t y = camera.image_height - i / camera.image_width - 1;
 
         Vec3 color(0., 0., 0.);
         for (size_t s = 0; s < n_samples; s++) {
@@ -162,21 +162,31 @@ std::vector<float> render(
 
 int main() {
     ShapePrimitive lambert_sphere(
-        Sphere(Pt3(-1.0f, 0.0f, -3.0f), 0.75f),
+        Sphere(Pt3(-1.5f, 0.0f, -3.0f), 0.7f),
         LambertMaterial<SolidColor>(Vec3(0.8f, 0.3f, 0.3f))
     );
 
     ShapePrimitive specular_sphere(
-        Sphere(Pt3(1.0f, 0.0f, -3.0f), 0.75f),
-        SpecularMaterial<SolidColor>(Vec3(0.8f, 0.3f, 0.3f), 0.2f)
+        Sphere(Pt3(1.5f, 0.0f, -3.0f), 0.7f),
+        SpecularMaterial<SolidColor>(Vec3(0.3f, 0.6f, 0.8f), 0.2f)
     );
 
-    Aggregate world({&lambert_sphere, &specular_sphere});
+    ShapePrimitive refractive_sphere(
+        Sphere(Pt3(0.0f, 0.0f, -3.0f), 0.7f),
+        RefractiveMaterial<SolidColor>(Vec3(0.9f, 0.95f, 1.0f), 1.2f)
+    );
+
+    ShapePrimitive emissive_sphere(
+        Sphere(Pt3(0.0f, 5.0f, 5.0f), 7.0f),
+        EmissiveMaterial<SolidColor>(Vec3(4.0f, 4.0f, 4.0f))
+    );
+
+    Aggregate world({&lambert_sphere, &specular_sphere, &refractive_sphere, &emissive_sphere});
 
     Camera camera(
-        800, 600, M_PI / 3.0f
+        800, 450, M_PI / 3.0f
     );
-    size_t n_samples = 64;
+    size_t n_samples = 144;
     size_t max_bounces = 16;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
