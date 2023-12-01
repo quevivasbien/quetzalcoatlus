@@ -9,6 +9,8 @@
 #include "ray.hpp"
 #include "vec.hpp"
 
+const size_t THREAD_JOB_SIZE = 4096;
+
 Vec3 pixel_color(
     const Ray& r,
     const Primitive& world,
@@ -55,10 +57,12 @@ void render_pixels(
     size_t max_bounces,
     float gamma,
     std::vector<float>& buffer,
-    size_t start_idx,
-    size_t end_idx
+    size_t start_index,
+    size_t end_index,
+    size_t& global_index,
+    std::mutex& mutex
 ) {
-    for (size_t i = start_idx; i < end_idx; i++) {
+    for (size_t i = start_index; i < end_index; i++) {
         Sampler sampler(static_cast<uint32_t>(i));
         size_t x = i % camera.image_width;
         size_t y = i / camera.image_width;
@@ -78,6 +82,28 @@ void render_pixels(
         buffer[i * 3 + 1] = color.y;
         buffer[i * 3 + 2] = color.z;
     }
+
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (global_index == camera.image_height * camera.image_width) {
+            return;
+        }
+        start_index = global_index;
+        global_index = MIN(global_index + THREAD_JOB_SIZE, camera.image_height * camera.image_width);
+        end_index = global_index;
+    }
+    render_pixels(
+        camera,
+        world,
+        n_samples,
+        max_bounces,
+        gamma,
+        buffer,
+        start_index,
+        end_index,
+        global_index,
+        mutex
+    );
 }
 
 std::vector<float> render(
@@ -89,13 +115,22 @@ std::vector<float> render(
 ) {
     std::vector<float> pixel_buffer(camera.image_width * camera.image_height * 3);
     std::vector<std::thread> threads;
-    auto n_threads = std::thread::hardware_concurrency();
-    size_t end_row = 0;
+    size_t image_size = camera.image_width * camera.image_height;
+    auto n_threads = MIN(
+        std::thread::hardware_concurrency(),
+        (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
+    );
+    std::cout << "Using " << n_threads << " threads" << std::endl;
+    size_t end_index = 0;
+    std::mutex mutex;
     for (size_t t = 0; t < n_threads; t++) {
-        size_t start_row = end_row;
-        end_row += camera.image_height / n_threads;
-        if (t == n_threads - 1) {
-            end_row = camera.image_height;
+        size_t start_index = end_index;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            end_index += THREAD_JOB_SIZE;
+            if (end_index > image_size) {
+                end_index = image_size;
+            }
         }
         threads.push_back(std::thread(
             render_pixels,
@@ -105,9 +140,11 @@ std::vector<float> render(
             max_bounces,
             gamma,
             std::ref(pixel_buffer),
-            start_row * camera.image_width,
-            end_row * camera.image_width)
-        );
+            start_index,
+            end_index,
+            std::ref(end_index),
+            std::ref(mutex)
+        ));
     }
     for (auto& t : threads) {
         t.join();
@@ -128,12 +165,17 @@ int main() {
     Camera camera(
         800, 600, M_PI / 3.0f
     );
+    size_t n_samples = 64;
+    size_t max_bounces = 16;
+
+    std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
+        n_samples << " samples and " << max_bounces << " bounces" << std::endl;
 
     auto start_time = std::chrono::steady_clock::now();
     auto pixels = render(
         camera,
         sphere,
-        4, 16, 0.43
+        n_samples, max_bounces, 0.43
     );
     auto end_time = std::chrono::steady_clock::now();
     std::cout << "Render time: " <<
