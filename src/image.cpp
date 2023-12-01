@@ -2,11 +2,11 @@
 #include <opencv2/opencv.hpp>
 #include <OpenImageDenoise/oidn.hpp>
 
-#include "render_result.hpp"
+#include "image.hpp"
 
-void RenderResult::save(const std::string& filename) const {
+void Image::save(const std::string& filename) const {
     std::vector<float> im_out(width * height * 3);
-    std::transform(buffer.begin(), buffer.end(), im_out.begin(), [](float c) { return c * 255.0f; });
+    std::transform(color_buffer.begin(), color_buffer.end(), im_out.begin(), [](float c) { return c * 255.0f; });
 
     cv::Mat image(height, width, CV_32FC3, im_out.data());
     cv::imwrite(filename, image);
@@ -24,7 +24,7 @@ void RenderResult::denoise() {
     filter.setImage("output", colorBuf, oidn::Format::Float3, width, height);
     filter.commit();
 
-    colorBuf.write(0, width * height * 3 * sizeof(float), buffer.data());
+    colorBuf.write(0, width * height * 3 * sizeof(float), color_buffer.data());
 
     filter.execute();
     const char* errorMessage;
@@ -32,5 +32,5 @@ void RenderResult::denoise() {
         std::cerr << "Error while denoising: " << errorMessage << std::endl;
     }
 
-    colorBuf.read(0, width * height * 3 * sizeof(float), buffer.data());
+    colorBuf.read(0, width * height * 3 * sizeof(float), color_buffer.data());
 }
