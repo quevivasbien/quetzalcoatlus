@@ -1,13 +1,15 @@
+#include <algorithm>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
-#include <opencv2/opencv.hpp>
 
 #include "camera.hpp"
 #include "primitive.hpp"
 #include "random.hpp"
 #include "ray.hpp"
+#include "render_result.hpp"
 #include "vec.hpp"
 
 const size_t THREAD_JOB_SIZE = 4096;
@@ -96,7 +98,7 @@ void render_pixels(
             return;
         }
         start_index = global_index;
-        global_index = MIN(global_index + THREAD_JOB_SIZE, camera.image_height * camera.image_width);
+        global_index = std::min(global_index + THREAD_JOB_SIZE, camera.image_height * camera.image_width);
         end_index = global_index;
     }
     render_pixels(
@@ -113,7 +115,7 @@ void render_pixels(
     );
 }
 
-std::vector<float> render(
+RenderResult render(
     const Camera& camera,
     const Primitive& world,
     size_t n_samples,
@@ -123,9 +125,9 @@ std::vector<float> render(
     std::vector<float> pixel_buffer(camera.image_width * camera.image_height * 3);
     std::vector<std::thread> threads;
     size_t image_size = camera.image_width * camera.image_height;
-    auto n_threads = MIN(
+    size_t n_threads = std::clamp<size_t>(
         std::thread::hardware_concurrency(),
-        (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
+        1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
     );
     std::cout << "Using " << n_threads << " threads" << std::endl;
     size_t end_index = 0;
@@ -157,7 +159,7 @@ std::vector<float> render(
         t.join();
     }
 
-    return pixel_buffer;
+    return RenderResult(std::move(pixel_buffer), camera.image_height, camera.image_width);
 }
 
 
@@ -197,14 +199,14 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 64;
+    size_t n_samples = 25;
     size_t max_bounces = 16;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
         n_samples << " samples and " << max_bounces << " bounces" << std::endl;
 
     auto start_time = std::chrono::steady_clock::now();
-    auto pixels = render(
+    auto result = render(
         camera,
         world,
         n_samples, max_bounces, 0.43
@@ -213,10 +215,9 @@ int main() {
     std::cout << "Render time: " <<
         std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() <<
         "ms" << std::endl;
-
-    std::transform(pixels.begin(), pixels.end(), pixels.begin(), [](float c) { return c * 255.0f; });
-    cv::Mat image(camera.image_height, camera.image_width, CV_32FC3, pixels.data());
-    cv::imwrite("image.png", image);
+    
+    result.denoise();
+    result.save("image.png");
 
     return 0;
 }
