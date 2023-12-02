@@ -3,32 +3,33 @@
 #include "random.hpp"
 #include "ray.hpp"
 #include "material.hpp"
-#include "shape.hpp"
 #include "texture.hpp"
 #include "vec.hpp"
 
 class Material;
 
-struct Intersection : ShapeIntersection {
-    const Material& material;
+struct ShapeIntersection {
+    float t;
+    Vec2 uv;
+    Vec3 normal;
+    Pt3 point;
+    bool outer_face;
 
-    Intersection(
-        const ShapeIntersection& si,
-        const Material& material
-    ) : ShapeIntersection(si), material(material) {}
+    ShapeIntersection(float t, Vec2 uv, Vec3 normal, Pt3 point, bool outer_face) : t(t), uv(uv), normal(normal), point(point), outer_face(outer_face) {}
 };
 
 
 struct ScatterEvent {
     std::optional<Ray> new_ray;
-        Vec3 color;
+    Vec3 color;
 
     ScatterEvent(std::optional<Ray> new_ray, Vec3 color) : new_ray(new_ray), color(color) {}
 };
 
+
 class Material {
 public:
-    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const = 0;
+    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const = 0;
 };
 
 
@@ -37,7 +38,7 @@ class LambertMaterial : public Material {
 public:
     explicit LambertMaterial(T&& texture) : texture(texture) {}
 
-    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
+    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
         Vec3 new_dir = isect.normal + sampler.sample_within_unit_sphere();
 
         if (new_dir.norm_squared() < 0.00001f) {
@@ -63,7 +64,7 @@ class SpecularMaterial : public Material {
 public:
     SpecularMaterial(T texture, float roughness) : texture(texture), roughness(roughness) {}
 
-    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
+    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
         Vec3 new_dir = ray.d.reflect(isect.normal);
         if (roughness > 0.0f) {
             new_dir += roughness * sampler.sample_within_unit_sphere();
@@ -92,7 +93,7 @@ class RefractiveMaterial : public Material {
 public:
     RefractiveMaterial(T texture, float ior) : texture(texture), ior(ior) {}
 
-    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
+    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
         float ior_ratio;
         Vec3 normal;
         if (isect.outer_face) {
@@ -137,7 +138,7 @@ class EmissiveMaterial : public Material {
 public:
     explicit EmissiveMaterial(T texture) : texture(texture) {}
 
-    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
+    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
         return ScatterEvent(
             std::nullopt,
             texture.value(isect.uv, isect.point)

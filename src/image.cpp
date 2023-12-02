@@ -14,6 +14,7 @@ void Image::save(const std::string& filename) const {
     }
 
     cv::Mat image(height, width, CV_32FC3, im_out.data());
+
     cv::imwrite(filename, image);
 }
 

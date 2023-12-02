@@ -15,13 +15,13 @@
  *
  * Scenes, like devices, are reference-counted.
  */
-Scene init_scene(RTCDevice &&device)
+Scene init_scene(RTCDevice &&device, Material* material)
 {
   Scene scene(std::move(device));
 
   // add_triangle(scene, Pt3(0, 0, 0), Pt3(1, 0, 0), Pt3(0, 1, 0));
 
-  add_sphere(scene, Pt3(0.f, 0.f, 0.f), 0.5f);
+  scene.add_sphere(Pt3(0.f, 0.f, 0.f), 0.5f, material);
   scene.commit();
 
   return scene;
@@ -32,34 +32,29 @@ Scene init_scene(RTCDevice &&device)
 int main()
 {
   RTCDevice device = initialize_device();
-  Scene scene = init_scene(std::move(device));
+  LambertMaterial material(SolidColor(0.5f, 0.5f, 0.5f));
+  Scene scene = init_scene(std::move(device), &material);
 
   Ray ray1(Pt3(0.33f, 0.33f, -1), Pt3(0, 0, 1));
   Ray ray2(Pt3(1.00f, 1.00f, -1), Pt3(0, 0, 1));
 
-  auto hit1 = scene.ray_intersect(ray1);
-  auto hit2 = scene.ray_intersect(ray2);
+  Sampler sampler(0, 2);
 
-  if (hit1)
-  {
-    printf("Found intersection on geometry %d, at t=%f\n",
-           hit1->geom_id,
-           hit1->t);
+  auto hit1 = scene.ray_intersect(ray1, sampler);
+  auto hit2 = scene.ray_intersect(ray2, sampler);
+
+  if (hit1) {
+    std::cout << "hit1: color = " << hit1->color.x << " " << hit1->color.y << " " << hit1->color.z << std::endl;
   }
-  else
-  {
-    printf("No intersection\n");
+  else {
+    std::cout << "hit1: no intersection" << std::endl;
   }
 
-  if (hit2)
-  {
-    printf("Found intersection on geometry %d, at t=%f\n",
-           hit2->geom_id,
-           hit2->t);
+  if (hit2) {
+    std::cout << "hit2: color = " << hit2->color.x << " " << hit2->color.y << " " << hit2->color.z << std::endl;
   }
-  else
-  {
-    printf("No intersection\n");
+  else {
+    std::cout << "hit2: no intersection" << std::endl;
   }
 
   return 0;

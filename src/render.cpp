@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 #include "render.hpp"
@@ -28,7 +29,7 @@ struct PixelSample {
 
 PixelSample sample_pixel(
     const Ray& r,
-    const Primitive& world,
+    const Scene& world,
     size_t max_bounces,
     Sampler& sampler
 ) {
@@ -37,16 +38,15 @@ PixelSample sample_pixel(
     sample.color = Vec3(1.0f, 1.0f, 1.0f);
 
     for (size_t i = 0; i < max_bounces; i++) {
-        auto isect = world.intersect(current_ray, Interval(0.001f, FLT_MAX));
+        auto isect = world.ray_intersect(current_ray, sampler);
         if (isect) {
-            auto se = isect->material.scatter(current_ray, *isect, sampler);
             if (i == 0) {
                 sample.normal = isect->normal;
-                sample.albedo = se.color;
+                sample.albedo = isect->color;
             }
-            sample.color *= se.color;
-            if (se.new_ray) {
-                current_ray = *(se.new_ray);
+            sample.color *= isect->color;
+            if (isect->new_ray) {
+                current_ray = *(isect->new_ray);
             }
             else {
                 return sample;
@@ -64,7 +64,7 @@ PixelSample sample_pixel(
 
 void render_pixels(
     const Camera& camera,
-    const Primitive* world,
+    const Scene& world,
     size_t n_samples,
     size_t max_bounces,
     RenderResult& result,
@@ -89,7 +89,7 @@ void render_pixels(
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
-            pixel += sample_pixel(r, *world, max_bounces, sampler);
+            pixel += sample_pixel(r, world, max_bounces, sampler);
         }
         pixel /= float(n_samples);
 
@@ -130,11 +130,15 @@ void render_pixels(
 
 RenderResult render(
     const Camera& camera,
-    const Primitive& world,
+    const Scene& scene,
     size_t n_samples,
     size_t max_bounces
 ) {
     RenderResult result(camera.image_height, camera.image_width);
+    if (!scene.ready) {
+        std::cout << "Scene must be committed before rendering." << std::endl;
+        return result;
+    }
     
     std::vector<std::thread> threads;
     size_t image_size = result.width * result.height;
@@ -157,7 +161,7 @@ RenderResult render(
         threads.push_back(std::thread(
             render_pixels,
             camera,
-            &world,
+            std::ref(scene),
             n_samples,
             max_bounces,
             std::ref(result),
