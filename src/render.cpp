@@ -6,43 +6,63 @@
 
 const size_t THREAD_JOB_SIZE = 4096;
 
-Vec3 pixel_color(
+struct PixelSample {
+    Vec3 color;
+    Vec3 normal;
+    Vec3 albedo;
+
+    PixelSample() : color(0.0f, 0.0f, 0.0f), normal(0.0f, 0.0f, 0.0f), albedo(0.0f, 0.0f, 0.0f) {}
+    
+    void operator+=(const PixelSample& other) {
+        color += other.color;
+        normal += other.normal;
+        albedo += other.albedo;
+    }
+
+    void operator/=(float c) {
+        color /= c;
+        normal /= c;
+        albedo /= c;
+    }
+};
+
+PixelSample sample_pixel(
     const Ray& r,
     const Primitive& world,
     size_t max_bounces,
     Sampler& sampler
 ) {
     Ray current_ray = r;
-    Vec3 color(1.0f, 1.0f, 1.0f);
+    PixelSample sample;
+    sample.color = Vec3(1.0f, 1.0f, 1.0f);
 
     for (size_t i = 0; i < max_bounces; i++) {
         auto isect = world.intersect(current_ray, Interval(0.001f, FLT_MAX));
         if (isect) {
             auto se = isect->material.scatter(current_ray, *isect, sampler);
             if (se) {
-                color *= se->color;
+                sample.color *= se->color;
                 if (se->new_ray) {
                     current_ray = *(se->new_ray);
+                    if (i == 0) {
+                        sample.normal = se->normal;
+                        sample.albedo = se->color;
+                    }
                 }
                 else {
-                    return color;
+                    return sample;
                 }
             }
             else {
-                return Vec3(0.0f, 0.0f, 0.0f);
+                return PixelSample{};
             }
         }
         else {
-            // // Show sky color
-            // Vec3 unit_direction = current_ray.d.normalize();
-            // float t = 0.5f * (unit_direction.y + 1.0f);
-            // Vec3 c = (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);
-            // return color * c;
-            return Vec3(0.0f, 0.0f, 0.0f);
+            return PixelSample{};
         }
     }
 
-    return Vec3(0.0f, 0.0f, 0.0f);
+    return PixelSample{};
 }
 
 void render_pixels(
@@ -50,8 +70,7 @@ void render_pixels(
     const Primitive* world,
     size_t n_samples,
     size_t max_bounces,
-    float gamma,
-    std::vector<float>& buffer,
+    RenderResult& result,
     size_t start_index,
     size_t end_index,
     size_t& global_index,
@@ -66,22 +85,28 @@ void render_pixels(
         size_t x = i % camera.image_width;
         size_t y = camera.image_height - i / camera.image_width - 1;
 
-        Vec3 color(0., 0., 0.);
+        PixelSample pixel{};
         for (size_t s = 0; s < n_samples; s++) {
             sampler.set_sample_index(s);
             auto jitter = sampler.sample_2d();
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
-            color += pixel_color(r, *world, max_bounces, sampler);
+            pixel += sample_pixel(r, *world, max_bounces, sampler);
         }
-        color /= float(n_samples);
-        color.map([gamma](float c) { return powf(c, 1.0f / gamma); });
+        pixel /= float(n_samples);
 
-        // put values in backward, since opencv uses BGR color format
-        buffer[i * 3 + 0] = color.z;
-        buffer[i * 3 + 1] = color.y;
-        buffer[i * 3 + 2] = color.x;
+        result.color_buffer[i * 3 + 0] = pixel.color.x;
+        result.color_buffer[i * 3 + 1] = pixel.color.y;
+        result.color_buffer[i * 3 + 2] = pixel.color.z;
+
+        result.normal_buffer[i * 3 + 0] = pixel.normal.x;
+        result.normal_buffer[i * 3 + 1] = pixel.normal.y;
+        result.normal_buffer[i * 3 + 2] = pixel.normal.z;
+
+        result.albedo_buffer[i * 3 + 0] = pixel.albedo.x;
+        result.albedo_buffer[i * 3 + 1] = pixel.albedo.y;
+        result.albedo_buffer[i * 3 + 2] = pixel.albedo.z;
     }
 
     {
@@ -98,8 +123,7 @@ void render_pixels(
         world,
         n_samples,
         max_bounces,
-        gamma,
-        buffer,
+        result,
         start_index,
         end_index,
         global_index,
@@ -111,12 +135,12 @@ RenderResult render(
     const Camera& camera,
     const Primitive& world,
     size_t n_samples,
-    size_t max_bounces,
-    float gamma
+    size_t max_bounces
 ) {
-    std::vector<float> pixel_buffer(camera.image_width * camera.image_height * 3);
+    RenderResult result(camera.image_height, camera.image_width);
+    
     std::vector<std::thread> threads;
-    size_t image_size = camera.image_width * camera.image_height;
+    size_t image_size = result.width * result.height;
     size_t n_threads = std::clamp<size_t>(
         std::thread::hardware_concurrency(),
         1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
@@ -139,8 +163,7 @@ RenderResult render(
             &world,
             n_samples,
             max_bounces,
-            gamma,
-            std::ref(pixel_buffer),
+            std::ref(result),
             start_index,
             end_index,
             std::ref(end_index),
@@ -151,5 +174,5 @@ RenderResult render(
         t.join();
     }
 
-    return RenderResult(std::move(pixel_buffer), camera.image_height, camera.image_width);
+    return result;
 }

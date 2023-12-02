@@ -10,7 +10,8 @@ public:
 
 class SolidColor : public Texture {
 public:
-    SolidColor(Vec3 color) : color(color) {}
+    explicit SolidColor(Vec3 color) : color(color) {}
+    SolidColor(float r, float g, float b) : color(r, g, b) {}
 
     Vec3 value(const Vec2& uv, const Pt3& point) const override {
         return color;

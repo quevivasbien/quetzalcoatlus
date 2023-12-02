@@ -16,18 +16,6 @@ add_library(lib
     src/shape.cpp
     src/texture.cpp
     src/vec.cpp
-
-    # src/camera.hpp
-    # src/image.hpp
-    # src/interval.hpp
-    # src/material.hpp
-    # src/primitive.hpp
-    # src/random.hpp
-    # src/shape.hpp
-    # src/texture.hpp
-    # src/vec.hpp
-
-    # src/examples/cornell_box.cpp
 )
 target_link_libraries(lib ${OpenCV_LIBS} ${OIDN_DIR}/lib/libOpenImageDenoise.so)
 

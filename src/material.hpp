@@ -22,8 +22,9 @@ struct Intersection : ShapeIntersection {
 struct ScatterEvent {
     std::optional<Ray> new_ray;
     Vec3 color;
+    Vec3 normal;
 
-    ScatterEvent(std::optional<Ray> new_ray, Vec3 color) : new_ray(new_ray), color(color) {}
+    ScatterEvent(std::optional<Ray> new_ray, Vec3 color, Vec3 normal) : new_ray(new_ray), color(color), normal(normal) {}
 };
 
 class Material {
@@ -47,7 +48,8 @@ public:
         Ray new_ray(isect.point, new_dir);
         return std::make_optional(ScatterEvent(
             std::make_optional(new_ray),
-            texture.value(isect.uv, isect.point)
+            texture.value(isect.uv, isect.point),
+            isect.normal
         ));
     }
 
@@ -72,7 +74,8 @@ public:
         Ray new_ray(isect.point, new_dir);
         return std::make_optional(ScatterEvent(
             std::make_optional(new_ray),
-            texture.value(isect.uv, isect.point)
+            texture.value(isect.uv, isect.point),
+            isect.normal
         ));
     }
 
@@ -109,7 +112,8 @@ public:
 
         return std::make_optional(ScatterEvent(
             std::make_optional(Ray(isect.point, new_dir)),
-            texture.value(isect.uv, isect.point)
+            texture.value(isect.uv, isect.point),
+            isect.normal
         ));
 
     }
@@ -134,7 +138,8 @@ public:
     virtual std::optional<ScatterEvent> scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
         return std::make_optional(ScatterEvent(
             std::nullopt,
-            texture.value(isect.uv, isect.point)
+            texture.value(isect.uv, isect.point),
+            isect.normal
         ));
     }
 
