@@ -30,7 +30,7 @@ std::optional<WorldIntersection> Scene::ray_intersect(const Ray& ray, Sampler& s
     rayhit.ray.dir_x = ray.d.x;
     rayhit.ray.dir_y = ray.d.y;
     rayhit.ray.dir_z = ray.d.z;
-    rayhit.ray.tnear = 0;
+    rayhit.ray.tnear = 0.0001f;
     rayhit.ray.tfar = std::numeric_limits<float>::infinity();
     rayhit.ray.mask = -1;
     rayhit.ray.flags = 0;
@@ -43,14 +43,12 @@ std::optional<WorldIntersection> Scene::ray_intersect(const Ray& ray, Sampler& s
         return std::nullopt;
     }
 
-    float t = rayhit.ray.tfar;
     Vec3 normal(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z);
 
     ShapeIntersection isect(
-        t,
         Vec2(rayhit.hit.u, rayhit.hit.v),
-        normal,
-        ray.at(t),
+        normal.normalize(),
+        ray.at(rayhit.ray.tfar),
         ray.d.dot(normal) < 0.0f
     );
     const Material* material = materials[rayhit.hit.geomID];
@@ -84,15 +82,9 @@ unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const
     ));
     
     if (vertices && indices) {
-        vertices[0] = a.x;
-        vertices[1] = a.y;
-        vertices[2] = a.z;
-        vertices[3] = b.x;
-        vertices[4] = b.y;
-        vertices[5] = b.z;
-        vertices[6] = c.x;
-        vertices[7] = c.y;
-        vertices[8] = c.z;
+        vertices[0] = a.x; vertices[1] = a.y; vertices[2] = a.z;
+        vertices[3] = b.x; vertices[4] = b.y; vertices[5] = b.z;
+        vertices[6] = c.x; vertices[7] = c.y; vertices[8] = c.z;
 
         indices[0] = 0;
         indices[1] = 1;
@@ -100,6 +92,61 @@ unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const
     }
     else {
         printf("Something went wrong when making triangle\n");
+    }
+
+    rtcCommitGeometry(geom);
+    unsigned int geom_id = rtcAttachGeometry(scene, geom);
+    rtcReleaseGeometry(geom);
+
+    materials.push_back(material);
+    if (materials.size() != geom_id + 1) {
+        std::cout << "Mismatch between materials and geom_ids" << std::endl;
+    }
+
+    return geom_id;
+}
+
+unsigned int Scene::add_quad(
+    const Pt3& a,
+    const Pt3& b,
+    const Pt3& c,
+    const Pt3& d,
+    const Material* material
+) {
+    RTCGeometry geom = rtcNewGeometry(
+        device,
+        RTC_GEOMETRY_TYPE_QUAD
+    );
+    float* vertices = static_cast<float*>(rtcSetNewGeometryBuffer(
+        geom,
+        RTC_BUFFER_TYPE_VERTEX,
+        0,
+        RTC_FORMAT_FLOAT3,
+        3 * sizeof(float),
+        4
+    ));
+    unsigned int* indices = static_cast<unsigned int*>(rtcSetNewGeometryBuffer(
+        geom,
+        RTC_BUFFER_TYPE_INDEX,
+        0,
+        RTC_FORMAT_UINT4,
+        4 * sizeof(unsigned int),
+        1
+    ));
+    
+    if (vertices && indices) {
+        vertices[0] = a.x; vertices[1] = a.y; vertices[2] = a.z;
+        vertices[3] = b.x; vertices[4] = b.y; vertices[5] = b.z;
+        vertices[6] = c.x; vertices[7] = c.y; vertices[8] = c.z;
+        vertices[9] = d.x; vertices[10] = d.y; vertices[11] = d.z;
+
+        indices[0] = 0;
+        indices[1] = 1;
+        indices[2] = 2;
+        indices[3] = 3;
+    }
+    else {
+        printf("Something went wrong when making quad\n");
     }
 
     rtcCommitGeometry(geom);

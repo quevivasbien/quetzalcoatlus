@@ -34,13 +34,16 @@ public:
     std::optional<WorldIntersection> ray_intersect(const Ray& ray, Sampler& sampler) const;
 
     // methods for adding shapes to scene; return geometry ID
+    // in cases where multiple points are required, they should be given in clockwise order around the outward face
 
     unsigned int add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material);
     unsigned int add_sphere(const Pt3& center, float radius, const Material* material);
+    unsigned int add_quad(const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d, const Material* material);
 
-    RTCScene scene;
-    RTCDevice device;
     bool ready = false;
 
+private:
+    RTCScene scene;
+    RTCDevice device;
     std::vector<const Material*> materials;
 };

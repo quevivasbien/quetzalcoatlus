@@ -26,7 +26,3 @@ target_link_libraries(lib
 )
 
 add_subdirectory(examples)
-
-add_executable(hello_embree hello_embree.cpp)
-target_link_libraries(hello_embree PRIVATE lib)
-target_include_directories(hello_embree PRIVATE ${CMAKE_SOURCE_DIR}/src)

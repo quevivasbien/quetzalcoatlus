@@ -9,13 +9,12 @@
 class Material;
 
 struct ShapeIntersection {
-    float t;
     Vec2 uv;
     Vec3 normal;
     Pt3 point;
     bool outer_face;
 
-    ShapeIntersection(float t, Vec2 uv, Vec3 normal, Pt3 point, bool outer_face) : t(t), uv(uv), normal(normal), point(point), outer_face(outer_face) {}
+    ShapeIntersection(Vec2 uv, Vec3 normal, Pt3 point, bool outer_face) : uv(uv), normal(normal), point(point), outer_face(outer_face) {}
 };
 
 
@@ -44,12 +43,12 @@ public:
         if (new_dir.norm_squared() < 0.00001f) {
             return ScatterEvent(
                 std::nullopt,
-                texture.value(isect.uv, isect.point)
+                Vec3(0.f, 0.f, 0.f)
             );
         }
 
         Ray new_ray(isect.point, new_dir);
-        return  ScatterEvent(
+        return ScatterEvent(
             std::make_optional(new_ray),
             texture.value(isect.uv, isect.point)
         );
@@ -72,7 +71,7 @@ public:
         if (new_dir.dot(isect.normal) < 0.0f) {
             return ScatterEvent(
                 std::nullopt,
-                texture.value(isect.uv, isect.point)
+                Vec3(0.f, 0.f, 0.f)
             );
         }
 
@@ -139,10 +138,18 @@ public:
     explicit EmissiveMaterial(T texture) : texture(texture) {}
 
     virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
-        return ScatterEvent(
-            std::nullopt,
-            texture.value(isect.uv, isect.point)
-        );
+        if (isect.outer_face) {
+            return ScatterEvent(
+                std::nullopt,
+                texture.value(isect.uv, isect.point)
+            );
+        }
+        else {
+            return ScatterEvent(
+                std::nullopt,
+                Vec3(0.f, 0.f, 0.f)
+            );
+        }
     }
 
     T texture;
