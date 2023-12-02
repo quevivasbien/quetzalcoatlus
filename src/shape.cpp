@@ -59,13 +59,13 @@ std::optional<ShapeIntersection> Plane::intersect(const Ray& ray, Interval t) co
         return std::nullopt;
     }
     Pt3 p = ray.at(dist);
-    return std::make_optional(ShapeIntersection(
+    return ShapeIntersection(
         dist,
         Vec2(),
         normal,
         p,
         ray.d.dot(normal) < 0.0f
-    ));
+    );
 }
 
 Bounds Plane::bounds() const {

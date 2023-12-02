@@ -40,29 +40,26 @@ PixelSample sample_pixel(
         auto isect = world.intersect(current_ray, Interval(0.001f, FLT_MAX));
         if (isect) {
             auto se = isect->material.scatter(current_ray, *isect, sampler);
-            if (se) {
-                sample.color *= se->color;
-                if (se->new_ray) {
-                    current_ray = *(se->new_ray);
-                    if (i == 0) {
-                        sample.normal = se->normal;
-                        sample.albedo = se->color;
-                    }
-                }
-                else {
-                    return sample;
-                }
+            if (i == 0) {
+                sample.normal = isect->normal;
+                sample.albedo = se.color;
+            }
+            sample.color *= se.color;
+            if (se.new_ray) {
+                current_ray = *(se.new_ray);
             }
             else {
-                return PixelSample{};
+                return sample;
             }
         }
         else {
-            return PixelSample{};
+            sample.color = Vec3(0.0f, 0.0f, 0.0f);
+            return sample;
         }
     }
 
-    return PixelSample{};
+    sample.color = Vec3(0.0f, 0.0f, 0.0f);
+    return sample;
 }
 
 void render_pixels(

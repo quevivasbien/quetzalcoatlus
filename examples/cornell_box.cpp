@@ -44,7 +44,7 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 36;
+    size_t n_samples = 4;
     size_t max_bounces = 16;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
@@ -67,9 +67,17 @@ int main() {
     result_im.color_buffer = result.color_buffer;
     result_im.denoise();
     result_im.save("cornell_box_denoise.png");
+
+    Image albedo_im(result.height, result.width);
+    albedo_im.color_buffer = result.albedo_buffer;
+    albedo_im.save("cornell_box_albedo.png");
+
+    Image normal_im(result.height, result.width);
+    normal_im.color_buffer = result.normal_buffer;
+    normal_im.save("cornell_box_normal.png");
     
     result.denoise();
-    result.save("cornell_box_pretty_denoise.png");
+    result.save("cornell_box_advanced_denoise.png");
 
     return 0;
 }

@@ -62,20 +62,20 @@ void RenderResult::denoise() {
     filter.set("cleanAux", true);
     filter.commit();
 
-    // prefilter normals
-    oidn::FilterRef normalFilter = device.newFilter("RT");
-    normalFilter.setImage("normal", normalBuf, oidn::Format::Float3, width, height);
-    normalFilter.setImage("output", normalBuf, oidn::Format::Float3, width, height);
-    normalFilter.commit();
+    // // prefilter normals
+    // oidn::FilterRef normalFilter = device.newFilter("RT");
+    // normalFilter.setImage("normal", normalBuf, oidn::Format::Float3, width, height);
+    // normalFilter.setImage("output", normalBuf, oidn::Format::Float3, width, height);
+    // normalFilter.commit();
 
-    // prefilter albedos
-    oidn::FilterRef albedoFilter = device.newFilter("RT");
-    albedoFilter.setImage("albedo", albedoBuf, oidn::Format::Float3, width, height);
-    albedoFilter.setImage("output", albedoBuf, oidn::Format::Float3, width, height);
-    albedoFilter.commit();
+    // // prefilter albedos
+    // oidn::FilterRef albedoFilter = device.newFilter("RT");
+    // albedoFilter.setImage("albedo", albedoBuf, oidn::Format::Float3, width, height);
+    // albedoFilter.setImage("output", albedoBuf, oidn::Format::Float3, width, height);
+    // albedoFilter.commit();
 
-    normalFilter.execute();
-    albedoFilter.execute();
+    // normalFilter.execute();
+    // albedoFilter.execute();
 
     filter.execute();
 

@@ -21,15 +21,14 @@ struct Intersection : ShapeIntersection {
 
 struct ScatterEvent {
     std::optional<Ray> new_ray;
-    Vec3 color;
-    Vec3 normal;
+        Vec3 color;
 
-    ScatterEvent(std::optional<Ray> new_ray, Vec3 color, Vec3 normal) : new_ray(new_ray), color(color), normal(normal) {}
+    ScatterEvent(std::optional<Ray> new_ray, Vec3 color) : new_ray(new_ray), color(color) {}
 };
 
 class Material {
 public:
-    virtual std::optional<ScatterEvent> scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const = 0;
+    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const = 0;
 };
 
 
@@ -38,19 +37,21 @@ class LambertMaterial : public Material {
 public:
     explicit LambertMaterial(T&& texture) : texture(texture) {}
 
-    virtual std::optional<ScatterEvent> scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
+    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
         Vec3 new_dir = isect.normal + sampler.sample_within_unit_sphere();
 
         if (new_dir.norm_squared() < 0.00001f) {
-            return std::nullopt;
+            return ScatterEvent(
+                std::nullopt,
+                texture.value(isect.uv, isect.point)
+            );
         }
 
         Ray new_ray(isect.point, new_dir);
-        return std::make_optional(ScatterEvent(
+        return  ScatterEvent(
             std::make_optional(new_ray),
-            texture.value(isect.uv, isect.point),
-            isect.normal
-        ));
+            texture.value(isect.uv, isect.point)
+        );
     }
 
     T texture;
@@ -62,21 +63,23 @@ class SpecularMaterial : public Material {
 public:
     SpecularMaterial(T texture, float roughness) : texture(texture), roughness(roughness) {}
 
-    virtual std::optional<ScatterEvent> scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
+    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
         Vec3 new_dir = ray.d.reflect(isect.normal);
         if (roughness > 0.0f) {
             new_dir += roughness * sampler.sample_within_unit_sphere();
         }
         if (new_dir.dot(isect.normal) < 0.0f) {
-            return std::nullopt;
+            return ScatterEvent(
+                std::nullopt,
+                texture.value(isect.uv, isect.point)
+            );
         }
 
         Ray new_ray(isect.point, new_dir);
-        return std::make_optional(ScatterEvent(
+        return ScatterEvent(
             std::make_optional(new_ray),
-            texture.value(isect.uv, isect.point),
-            isect.normal
-        ));
+            texture.value(isect.uv, isect.point)
+        );
     }
 
     T texture;
@@ -89,7 +92,7 @@ class RefractiveMaterial : public Material {
 public:
     RefractiveMaterial(T texture, float ior) : texture(texture), ior(ior) {}
 
-    virtual std::optional<ScatterEvent> scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
+    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
         float ior_ratio;
         Vec3 normal;
         if (isect.outer_face) {
@@ -110,11 +113,10 @@ public:
             new_dir = ray.d.normalize().refract(normal, ior_ratio);
         }
 
-        return std::make_optional(ScatterEvent(
+        return  ScatterEvent(
             std::make_optional(Ray(isect.point, new_dir)),
-            texture.value(isect.uv, isect.point),
-            isect.normal
-        ));
+            texture.value(isect.uv, isect.point)
+        );
 
     }
 
@@ -135,12 +137,11 @@ class EmissiveMaterial : public Material {
 public:
     explicit EmissiveMaterial(T texture) : texture(texture) {}
 
-    virtual std::optional<ScatterEvent> scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
-        return std::make_optional(ScatterEvent(
+    virtual ScatterEvent scatter(const Ray& ray, const Intersection& isect, Sampler& sampler) const override {
+        return ScatterEvent(
             std::nullopt,
-            texture.value(isect.uv, isect.point),
-            isect.normal
-        ));
+            texture.value(isect.uv, isect.point)
+        );
     }
 
     T texture;
