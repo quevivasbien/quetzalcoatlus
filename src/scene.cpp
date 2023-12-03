@@ -22,7 +22,21 @@ void Scene::commit() {
     ready = true;
 }
 
-std::optional<WorldIntersection> Scene::ray_intersect(const Ray& ray, Sampler& sampler) const {
+Vec2 get_sphere_uv(const Vec3& n) {
+    float phi = atan2f(n.z, n.x) + M_PI;
+    float u = phi / (2.0f * M_PI);
+    if (u >= 1.0f) {
+        u -= __FLT_EPSILON__;
+    }
+    float theta = acosf(n.y);
+    float v = theta / M_PI;
+    if (v >= 1.0f) {
+        v -= __FLT_EPSILON__;
+    }
+    return Vec2(u, v);
+}
+
+std::optional<SceneIntersection> Scene::ray_intersect(const Ray& ray, Sampler& sampler) const {
     RTCRayHit rayhit;
     rayhit.ray.org_x = ray.o.x;
     rayhit.ray.org_y = ray.o.y;
@@ -43,17 +57,24 @@ std::optional<WorldIntersection> Scene::ray_intersect(const Ray& ray, Sampler& s
         return std::nullopt;
     }
 
-    Vec3 normal(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z);
+    Vec3 normal = Vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
+    Vec2 uv(rayhit.hit.u, rayhit.hit.v);
+
+    // embree doesn't have uv coordinates for spheres
+    // need to calculate this manually
+    if (shapes[rayhit.hit.geomID] == Shape::SPHERE) {
+        uv = get_sphere_uv(normal);
+    }
 
     ShapeIntersection isect(
-        Vec2(rayhit.hit.u, rayhit.hit.v),
-        normal.normalize(),
+        uv,
+        normal,
         ray.at(rayhit.ray.tfar),
         ray.d.dot(normal) < 0.0f
     );
     const Material* material = materials[rayhit.hit.geomID];
 
-    return WorldIntersection(
+    return SceneIntersection(
         material->scatter(ray, isect, sampler),
         normal
     );
@@ -102,6 +123,7 @@ unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const
     if (materials.size() != geom_id + 1) {
         std::cout << "Mismatch between materials and geom_ids" << std::endl;
     }
+    shapes.push_back(Shape::TRIANGLE);
 
     return geom_id;
 }
@@ -157,6 +179,7 @@ unsigned int Scene::add_quad(
     if (materials.size() != geom_id + 1) {
         std::cout << "Mismatch between materials and geom_ids" << std::endl;
     }
+    shapes.push_back(Shape::QUAD);
 
     return geom_id;
 }
@@ -193,6 +216,7 @@ unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* 
     if (materials.size() != geom_id + 1) {
         std::cout << "Mismatch between materials and geom_ids" << std::endl;
     }
+    shapes.push_back(Shape::SPHERE);
 
     return geom_id;
 }

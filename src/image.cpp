@@ -4,13 +4,13 @@
 
 #include "image.hpp"
 
-void Image::save(const std::string& filename) const {
+void Image::save(const std::string& filename, float gamma) const {
     std::vector<float> im_out(width * height * 3);
     // switch to range 0-255 and swap B and R to conform to format expected by opencv
     for (size_t i = 0; i < width * height; i ++) {
-        im_out[3 * i + 0] = 255.0f * color_buffer[3 * i + 2];
-        im_out[3 * i + 1] = 255.0f * color_buffer[3 * i + 1];
-        im_out[3 * i + 2] = 255.0f * color_buffer[3 * i + 0];
+        im_out[3 * i + 0] = 255.0f * powf(color_buffer[3 * i + 2], gamma);
+        im_out[3 * i + 1] = 255.0f * powf(color_buffer[3 * i + 1], gamma);
+        im_out[3 * i + 2] = 255.0f * powf(color_buffer[3 * i + 0], gamma);
     }
 
     cv::Mat image(height, width, CV_32FC3, im_out.data());

@@ -14,10 +14,16 @@
 
 RTCDevice initialize_device();
 
-struct WorldIntersection : ScatterEvent {
+struct SceneIntersection : ScatterEvent {
     Vec3 normal;
 
-    WorldIntersection(ScatterEvent&& se, Vec3 normal) : ScatterEvent(std::move(se)), normal(normal) {}
+    SceneIntersection(ScatterEvent&& se, Vec3 normal) : ScatterEvent(std::move(se)), normal(normal) {}
+};
+
+enum Shape {
+    SPHERE,
+    TRIANGLE,
+    QUAD
 };
 
 class Scene {
@@ -31,7 +37,7 @@ public:
 
     void commit();
 
-    std::optional<WorldIntersection> ray_intersect(const Ray& ray, Sampler& sampler) const;
+    std::optional<SceneIntersection> ray_intersect(const Ray& ray, Sampler& sampler) const;
 
     // methods for adding shapes to scene; return geometry ID
     // in cases where multiple points are required, they should be given in clockwise order around the outward face
@@ -46,4 +52,5 @@ private:
     RTCScene scene;
     RTCDevice device;
     std::vector<const Material*> materials;
+    std::vector<Shape> shapes;
 };

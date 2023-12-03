@@ -9,41 +9,9 @@
 
 
 int main() {
-    // ShapePrimitive light(
-    //     Quad(Pt3(-1.0, 1.99, -4.0), Vec3(0.0, 0.0, -2.0), Vec3(2.0, 0.0, 0.0)),
-    //     EmissiveMaterial(SolidColor(4.0, 4.0, 4.0))
-    // );
-    // ShapePrimitive ceiling(
-    //     Quad(Pt3(-2.0, 2.0, -3.0), Vec3(0.0, 0.0, -4.0), Vec3(4.0, 0.0, 0.0)),
-    //     LambertMaterial(SolidColor(0.8f, 0.8f, 0.2f))
-    // );
-    // ShapePrimitive floor(
-    //     Quad(Pt3(-2.0, -2.0, -3.0), Vec3(4.0, 0.0, 0.0), Vec3(0.0, 0.0, -4.0)),
-    //     LambertMaterial(SolidColor(0.3f, 0.8f, 0.8f))
-    // );
-    // ShapePrimitive left_wall(
-    //     Quad(Pt3(-2.0, -2.0, -3.0), Vec3(0.0, 0.0, -4.0), Vec3(0.0, 4.0, 0.0)),
-    //     LambertMaterial(SolidColor(1.0f, 0.2f, 0.2f))
-    // );
-    // ShapePrimitive right_wall(
-    //     Quad(Pt3(2.0, -2.0, -3.0), Vec3(0.0, 4.0, 0.0), Vec3(0.0, 0.0, -4.0)),
-    //     LambertMaterial(SolidColor(0.3f, 0.3f, 0.8f))
-    // );
-    // ShapePrimitive back_wall(
-    //     Quad(Pt3(-2.0, -2.0, -7.0), Vec3(4.0, 0.0, 0.0), Vec3(0.0, 4.0, 0.0)),
-    //     LambertMaterial(SolidColor(0.2f, 0.8f, 0.2f))
-    // );
-
-    // ShapePrimitive specular_sphere(
-    //     Sphere(Pt3(0.0f, -1.0f, -5.0f), 1.0),
-    //     SpecularMaterial(SolidColor(0.3f, 0.6f, 0.8f), 0.1f)
-    // );
-
-    // Aggregate world({&light, &ceiling, &floor, &left_wall, &right_wall, &back_wall, &specular_sphere});
-
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(4.0f, 4.0f, 4.0f));
+    EmissiveMaterial light(SolidColor(2.0f, 2.0f, 2.0f));
     scene.add_quad(
         Pt3(-1.f, 1.9999f, -6.f),
         Pt3(1.f, 1.9999f, -6.f),
@@ -51,7 +19,7 @@ int main() {
         Pt3(-1.f, 1.9999f, -4.f),
         &light
     );
-    LambertMaterial ceiling(SolidColor(0.8f, 0.8f, 0.2f));
+    LambertMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, 2.f, -7.f),
         Pt3(2.f, 2.f, -7.f),
@@ -59,7 +27,7 @@ int main() {
         Pt3(-2.f, 2.f, -3.f),
         &ceiling
     );
-    LambertMaterial floor(SolidColor(0.3f, 0.8f, 0.8f));
+    LambertMaterial floor(SolidColor(0.1f, 0.6f, 0.8f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -3.f),
         Pt3(2.f, -2.f, -3.f),
@@ -67,7 +35,7 @@ int main() {
         Pt3(-2.f, -2.f, -7.f),
         &floor
     );
-    LambertMaterial left_wall(SolidColor(1.0f, 0.2f, 0.2f));
+    LambertMaterial left_wall(SolidColor(0.8f, 0.1f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -3.f),
         Pt3(-2.f, -2.f, -7.f),
@@ -75,7 +43,7 @@ int main() {
         Pt3(-2.f, 2.f, -3.f),
         &left_wall
     );
-    LambertMaterial right_wall(SolidColor(0.3f, 0.3f, 0.8f));
+    LambertMaterial right_wall(SolidColor(0.1f, 0.1f, 0.8f));
     scene.add_quad(
         Pt3(2.f, -2.f, -3.f),
         Pt3(2.f, 2.f, -3.f),
@@ -83,7 +51,7 @@ int main() {
         Pt3(2.f, -2.f, -7.f),
         &right_wall
     );
-    LambertMaterial back_wall(SolidColor(0.2f, 0.8f, 0.2f));
+    LambertMaterial back_wall(SolidColor(0.1f, 0.8f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -7.f),
         Pt3(2.f, -2.f, -7.f),
@@ -91,7 +59,7 @@ int main() {
         Pt3(-2.f, 2.f, -7.f),
         &back_wall
     );
-    SpecularMaterial sphere(SolidColor(0.3f, 0.6f, 0.8f), 0.1f);
+    SpecularMaterial sphere(SolidColor(0.9f, 0.9f, 0.9f), 0.0f);
     scene.add_sphere(
         Pt3(0.0f, -1.0f, -5.0f), 1.0f,
         &sphere
@@ -102,8 +70,8 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 16;
-    size_t max_bounces = 16;
+    size_t n_samples = 9;
+    size_t max_bounces = 32;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
         n_samples << " samples and " << max_bounces << " bounces" << std::endl;
