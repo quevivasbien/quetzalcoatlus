@@ -1,9 +1,14 @@
 #include <algorithm>
+#include <array>
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 #include "render.hpp"
+
+// #define USE_RAY_PACKETS
+#define MULTITHREADED
 
 const size_t THREAD_JOB_SIZE = 4096;
 
@@ -29,14 +34,14 @@ struct PixelSample {
 
 Vec3 sample_pixel_inner(
     const Ray& r,
-    const Scene& world,
+    const Scene& scene,
     Sampler& sampler,
     size_t bounces
 ) {
     if (bounces == 0) {
         return Vec3(0.0f, 0.0f, 0.0f);
     }
-    auto isect = world.ray_intersect(r, sampler);
+    auto isect = scene.ray_intersect(r, sampler);
     if (!isect) {
         return Vec3(0.0f, 0.0f, 0.0f);
     }
@@ -45,19 +50,18 @@ Vec3 sample_pixel_inner(
     }
     
     return (
-        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, world, sampler, bounces-1)
+        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, sampler, bounces-1)
     ) / isect->pdf;
 }
 
 PixelSample sample_pixel(
     const Ray& r,
-    const Scene& world,
+    const Scene& scene,
     Sampler& sampler,
     size_t bounces
 ) {
-    // first sample is different, since we want to collect the normal and albedo
     PixelSample pixel_sample;
-    auto isect = world.ray_intersect(r, sampler);
+    auto isect = scene.ray_intersect(r, sampler);
     if (!isect) {
         return pixel_sample;
     }
@@ -69,10 +73,104 @@ PixelSample sample_pixel(
     }
 
     pixel_sample.color = (
-        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, world, sampler, bounces-1)
+        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, sampler, bounces-1)
     ) / isect->pdf;
 
     return pixel_sample;
+}
+
+std::array<Vec3, 4> sample_pixel_inner(
+    const std::array<Ray, 4>& rays,
+    const std::array<int, 4>& valid,
+    const Scene& scene,
+    Sampler& sampler,
+    size_t bounces
+) {
+    std::array<Vec3, 4> samples;
+    if (bounces == 0) {
+        return samples;
+    }
+    auto isects = scene.ray_intersect(rays, sampler, valid);
+    std::array<Ray, 4> new_rays;
+    std::array<int, 4> new_valid = {0, 0, 0, 0};
+    for (size_t i = 0; i < 4; i++) {
+        if (valid[i] == 0 || !isects[i]) {
+            continue;
+        }
+        if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
+            samples[i] = isects[i]->color;
+            continue;
+        }
+        new_rays[i] = *isects[i]->new_ray;
+        new_valid[i] = -1;
+    }
+    bool exit = true;
+    for (size_t i = 0; i < 4; i++) {
+        if (new_valid[i] != 0) {
+            exit = false;
+            break;
+        }
+    }
+    if (exit) {
+        return samples;
+    }
+    auto inner_samples = sample_pixel_inner(new_rays, new_valid, scene, sampler, bounces-1);
+    for (size_t i = 0; i < 4; i++) {
+        if (new_valid[i] == 0) {
+            continue;
+        }
+        samples[i] = (
+            isects[i]->color * isects[i]->pdf * inner_samples[i]
+        ) / isects[i]->pdf;
+    }
+    return samples;
+}
+
+std::array<PixelSample, 4> sample_pixel(
+    const std::array<Ray, 4>& rays,
+    const Scene& scene,
+    Sampler& sampler,
+    size_t bounces
+) {
+    std::array<PixelSample, 4> pixel_samples;
+    // valid = -1 means we want to continue tracing this ray
+    // valid = 0 means we want to stop tracing this ray
+    // this is just based on embree syntax for rtcIntersect4/8/16
+    std::array<Ray, 4> new_rays;
+    std::array<int, 4> valid = { 0, 0, 0, 0};
+    auto isects = scene.ray_intersect(rays, sampler);
+    for (size_t i = 0; i < 4; i++) {
+        if (!isects[i]) {
+            continue;
+        }
+        pixel_samples[i].normal = isects[i]->normal;
+        pixel_samples[i].albedo = isects[i]->color;
+        if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
+            pixel_samples[i].color = isects[i]->color;
+            continue;
+        }
+        new_rays[i] = *isects[i]->new_ray;
+        valid[i] = -1;
+    }
+    bool exit = true;
+    for (size_t i = 0; i < 4; i++) {
+        if (valid[i] != 0) {
+            exit = false;
+            break;
+        }
+    }
+    if (exit) {
+        return pixel_samples;
+    }
+    
+    auto inner_samples = sample_pixel_inner(new_rays, valid, scene, sampler, bounces-1);
+    for (size_t i = 0; i < 4; i++) {
+        pixel_samples[i].color = (
+            isects[i]->color * isects[i]->pdf * inner_samples[i]
+        ) / isects[i]->pdf;
+    }
+
+    return pixel_samples;
 }
 
 void render_pixels(
@@ -96,6 +194,32 @@ void render_pixels(
         size_t y = camera.image_height - i / camera.image_width - 1;
 
         PixelSample pixel{};
+        #ifdef USE_RAY_PACKETS
+        size_t n_chunks = n_samples / 4;
+        size_t rem  = n_samples % 4;
+        for (size_t chunk = 0; chunk < n_chunks; chunk++) {
+            std::array<Ray, 4> rays;
+            for (size_t ss = 0; ss < 4; ss++) {
+                sampler.set_sample_index(chunk * 4 + ss);
+                auto jitter = sampler.sample_2d();
+                float u = float(x) + jitter.x;
+                float v = float(y) + jitter.y;
+                rays[ss] = camera.cast_ray(u, v); 
+            }
+            std::array<PixelSample, 4> samples = sample_pixel(rays, world, sampler, max_bounces);
+            for (size_t s = 0; s < 4; s++) {
+                pixel += samples[s];
+            }
+        }
+        for (size_t s = 0; s < rem; s++) {
+            sampler.set_sample_index(n_chunks * 4 + s);
+            auto jitter = sampler.sample_2d();
+            float u = float(x) + jitter.x;
+            float v = float(y) + jitter.y;
+            Ray r = camera.cast_ray(u, v);
+            pixel += sample_pixel(r, world, sampler, max_bounces);
+        }
+        #else
         for (size_t s = 0; s < n_samples; s++) {
             sampler.set_sample_index(s);
             auto jitter = sampler.sample_2d();
@@ -104,6 +228,7 @@ void render_pixels(
             Ray r = camera.cast_ray(u, v);
             pixel += sample_pixel(r, world, sampler, max_bounces);
         }
+        #endif
         pixel /= float(n_samples);
 
         result.color_buffer[i * 3 + 0] = pixel.color.x;
@@ -155,11 +280,14 @@ RenderResult render(
     
     std::vector<std::thread> threads;
     size_t image_size = result.width * result.height;
+    #ifdef MULTITHREADED
     size_t n_threads = std::clamp<size_t>(
         std::thread::hardware_concurrency(),
         1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
     );
-    // size_t n_threads = 1;
+    #else
+    size_t n_threads = 1;
+    #endif
     std::cout << "Using " << n_threads << " threads" << std::endl;
     size_t end_index = 0;
     std::mutex mutex;

@@ -97,7 +97,7 @@ public:
 
         float cos_theta = -normal.dot(ray.d);
         Vec3 new_dir;
-        if (reflectance(cos_theta, ior_ratio) > sampler.sample_1d()) {
+        if (reflectance(cos_theta, ior_ratio) > sampler.dist(sampler.rng)) {
             new_dir = ray.d.reflect(normal);
         }
         else {

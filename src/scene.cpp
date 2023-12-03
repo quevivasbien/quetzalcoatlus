@@ -80,6 +80,61 @@ std::optional<SceneIntersection> Scene::ray_intersect(const Ray& ray, Sampler& s
     );
 }
 
+std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
+    const std::array<Ray, 4>& rays,
+    Sampler& sampler,
+    const std::array<int, 4>& valid
+) const {
+    RTCRayHit4 rayhits;
+    for (size_t i = 0; i < 4; i++) {
+        if (valid[i] == 0) {
+            continue;
+        }
+        rayhits.ray.org_x[i] = rays[i].o.x;
+        rayhits.ray.org_y[i] = rays[i].o.y;
+        rayhits.ray.org_z[i] = rays[i].o.z;
+        rayhits.ray.dir_x[i] = rays[i].d.x;
+        rayhits.ray.dir_y[i] = rays[i].d.y;
+        rayhits.ray.dir_z[i] = rays[i].d.z;
+        rayhits.ray.tnear[i] = 0.0001f;
+        rayhits.ray.tfar[i] = std::numeric_limits<float>::infinity();
+        rayhits.ray.mask[i] = -1;
+        rayhits.ray.flags[i] = 0;
+        rayhits.hit.geomID[i] = RTC_INVALID_GEOMETRY_ID;
+        rayhits.hit.instID[0][i] = RTC_INVALID_GEOMETRY_ID;
+    }
+
+    rtcIntersect4(valid.data(), scene, &rayhits);
+
+    std::array<std::optional<SceneIntersection>, 4> result;
+    for (size_t i = 0; i < 4; i++) {
+        if (valid[i] == 0) {
+            continue;
+        }
+        if (rayhits.hit.geomID[i] == RTC_INVALID_GEOMETRY_ID) {
+            continue;
+        }
+        Vec3 normal = Vec3(rayhits.hit.Ng_x[i], rayhits.hit.Ng_y[i], rayhits.hit.Ng_z[i]).normalize();
+        Vec2 uv(rayhits.hit.u[i], rayhits.hit.v[i]);
+        if (shapes[rayhits.hit.geomID[i]] == Shape::SPHERE) {
+            uv = get_sphere_uv(normal);
+        }
+        ShapeIntersection isect(
+            uv,
+            normal,
+            rays[i].at(rayhits.ray.tfar[i]),
+            rays[i].d.dot(normal) < 0.0f
+        );
+        const Material* material = materials[rayhits.hit.geomID[i]];
+        result[i] = SceneIntersection(
+            material->scatter(rays[i], isect, sampler),
+            normal
+        );
+    }
+
+    return result;
+}
+
 unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material) {
     RTCGeometry geom = rtcNewGeometry(
         device,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -37,7 +38,14 @@ public:
 
     void commit();
 
+    // intersect a single ray with the scene
     std::optional<SceneIntersection> ray_intersect(const Ray& ray, Sampler& sampler) const;
+    // intersect a packet of 4 rays with the scene
+    std::array<std::optional<SceneIntersection>, 4> ray_intersect(
+        const std::array<Ray, 4>& rays,
+        Sampler& sampler,
+        const std::array<int, 4>& valid = { -1, -1, -1, -1 }
+    ) const;
 
     // methods for adding shapes to scene; return geometry ID
     // in cases where multiple points are required, they should be given in clockwise order around the outward face

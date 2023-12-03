@@ -44,8 +44,8 @@ int main() {
     );
     scene.commit();
 
-    Camera camera(1920, 1080, 1.);
-    size_t n_samples = 25;
+    Camera camera(1920, 1080, M_PI_4);
+    size_t n_samples = 16;
     size_t max_bounces = 64;
 
     auto start_time = std::chrono::steady_clock::now();

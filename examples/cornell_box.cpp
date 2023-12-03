@@ -11,7 +11,7 @@
 int main() {
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(2.0f, 2.0f, 2.0f));
+    EmissiveMaterial light(SolidColor(4.0f, 4.0f, 4.0f));
     scene.add_quad(
         Pt3(-1.f, 1.9999f, -6.f),
         Pt3(1.f, 1.9999f, -6.f),
@@ -59,7 +59,7 @@ int main() {
         Pt3(-2.f, 2.f, -7.f),
         &back_wall
     );
-    SpecularMaterial sphere(SolidColor(0.9f, 0.9f, 0.9f), 0.0f);
+    RefractiveMaterial sphere(SolidColor(0.9f, 0.9f, 0.9f), 1.4f);
     scene.add_sphere(
         Pt3(0.0f, -1.0f, -5.0f), 1.0f,
         &sphere
@@ -70,7 +70,7 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 9;
+    size_t n_samples = 36;
     size_t max_bounces = 32;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
