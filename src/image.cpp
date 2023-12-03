@@ -18,9 +18,11 @@ void Image::save(const std::string& filename, float gamma) const {
     cv::imwrite(filename, image);
 }
 
-void Image::denoise() {
+void Image::denoise(bool verbose) {
     oidn::DeviceRef device = oidn::newDevice();
-    device.set("verbose", 1);
+    if (verbose) {
+        device.set("verbose", 1);
+    }
     device.commit();
 
     oidn::BufferRef colorBuf = device.newBuffer(width * height * 3 * sizeof(float));
@@ -42,9 +44,11 @@ void Image::denoise() {
 }
 
 
-void RenderResult::denoise() {
+void RenderResult::denoise(bool verbose) {
     oidn::DeviceRef device = oidn::newDevice();
-    device.set("verbose", 1);
+    if (verbose) {
+        device.set("verbose", 1);
+    }
     device.commit();
 
     oidn::BufferRef colorBuf = device.newBuffer(width * height * 3 * sizeof(float));

@@ -184,6 +184,18 @@ unsigned int Scene::add_quad(
     return geom_id;
 }
 
+unsigned int Scene::add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size) {
+    // plane will be modeled as a large quad centered around the given point
+    
+    OrthonormalBasis basis(n);
+    Pt3 a = p - basis.u[0] * half_size - basis.u[1] * half_size;
+    Pt3 b = p + basis.u[0] * half_size - basis.u[1] * half_size;
+    Pt3 c = p + basis.u[0] * half_size + basis.u[1] * half_size;
+    Pt3 d = p - basis.u[0] * half_size + basis.u[1] * half_size;
+    
+    return add_quad(a, b, c, d, material); 
+}
+
 unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* material) {
     RTCGeometry geom = rtcNewGeometry(
         device,

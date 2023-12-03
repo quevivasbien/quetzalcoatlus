@@ -46,7 +46,13 @@ public:
 
     Vec3 value(const Vec2& uv, const Pt3& point) const override {
         size_t x = uv.x * image.width;
+        if (x == image.width) {
+            x = image.width - 1;
+        }
         size_t y = uv.y * image.height;
+        if (y == image.height) {
+            y = image.height - 1;
+        }
         return Vec3(image.color_buffer[3 * (y * image.width + x) + 0],
                     image.color_buffer[3 * (y * image.width + x) + 1],
                     image.color_buffer[3 * (y * image.width + x) + 2]);

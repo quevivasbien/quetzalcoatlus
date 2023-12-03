@@ -45,6 +45,8 @@ public:
     unsigned int add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material);
     unsigned int add_sphere(const Pt3& center, float radius, const Material* material);
     unsigned int add_quad(const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d, const Material* material);
+    // plane is just a large square quad centered around the given point
+    unsigned int add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
 
     bool ready = false;
 

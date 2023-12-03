@@ -1,5 +1,6 @@
 #pragma once
 
+#include "onb.hpp"
 #include "random.hpp"
 #include "ray.hpp"
 #include "material.hpp"
@@ -21,8 +22,9 @@ struct ShapeIntersection {
 struct ScatterEvent {
     std::optional<Ray> new_ray;
     Vec3 color;
+    float pdf;
 
-    ScatterEvent(std::optional<Ray> new_ray, Vec3 color) : new_ray(new_ray), color(color) {}
+    ScatterEvent(std::optional<Ray> new_ray, Vec3 color, float pdf = 1.0f) : new_ray(new_ray), color(color), pdf(pdf) {}
 };
 
 
@@ -38,19 +40,14 @@ public:
     explicit LambertMaterial(T&& texture) : texture(texture) {}
 
     virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
-        Vec3 new_dir = isect.normal + sampler.sample_within_unit_sphere();
-
-        if (new_dir.norm_squared() < 0.00001f) {
-            return ScatterEvent(
-                std::nullopt,
-                Vec3(0.f, 0.f, 0.f)
-            );
-        }
+        OrthonormalBasis onb(isect.normal);
+        Vec3 new_dir = onb.from_local(sampler.sample_cosine_hemisphere());
 
         Ray new_ray(isect.point, new_dir);
         return ScatterEvent(
-            std::make_optional(new_ray),
-            texture.value(isect.uv, isect.point)
+            new_ray,
+            texture.value(isect.uv, isect.point),
+            sampler.cosine_hemisphere_pdf(onb.u[0].dot(new_dir))
         );
     }
 
@@ -66,18 +63,12 @@ public:
     virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
         Vec3 new_dir = ray.d.reflect(isect.normal);
         if (roughness > 0.0f) {
-            new_dir += roughness * sampler.sample_within_unit_sphere();
-        }
-        if (new_dir.dot(isect.normal) < 0.0f) {
-            return ScatterEvent(
-                std::nullopt,
-                Vec3(0.f, 0.f, 0.f)
-            );
+            new_dir += roughness * sampler.sample_uniform_sphere() * sampler.dist(sampler.rng);
         }
 
         Ray new_ray(isect.point, new_dir);
         return ScatterEvent(
-            std::make_optional(new_ray),
+            new_ray,
             texture.value(isect.uv, isect.point)
         );
     }
@@ -117,7 +108,6 @@ public:
             std::make_optional(Ray(isect.point, new_dir)),
             texture.value(isect.uv, isect.point)
         );
-
     }
 
     T texture;

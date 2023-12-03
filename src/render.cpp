@@ -13,7 +13,7 @@ struct PixelSample {
     Vec3 albedo;
 
     PixelSample() : color(0.0f, 0.0f, 0.0f), normal(0.0f, 0.0f, 0.0f), albedo(0.0f, 0.0f, 0.0f) {}
-    
+
     void operator+=(const PixelSample& other) {
         color += other.color;
         normal += other.normal;
@@ -27,39 +27,52 @@ struct PixelSample {
     }
 };
 
+Vec3 sample_pixel_inner(
+    const Ray& r,
+    const Scene& world,
+    Sampler& sampler,
+    size_t bounces
+) {
+    if (bounces == 0) {
+        return Vec3(0.0f, 0.0f, 0.0f);
+    }
+    auto isect = world.ray_intersect(r, sampler);
+    if (!isect) {
+        return Vec3(0.0f, 0.0f, 0.0f);
+    }
+    if (!isect->new_ray || isect->pdf == 0.f) {
+        return isect->color;
+    }
+    
+    return (
+        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, world, sampler, bounces-1)
+    ) / isect->pdf;
+}
+
 PixelSample sample_pixel(
     const Ray& r,
     const Scene& world,
-    size_t max_bounces,
-    Sampler& sampler
+    Sampler& sampler,
+    size_t bounces
 ) {
-    Ray current_ray = r;
-    PixelSample sample;
-    sample.color = Vec3(1.0f, 1.0f, 1.0f);
-
-    for (size_t i = 0; i < max_bounces; i++) {
-        auto isect = world.ray_intersect(current_ray, sampler);
-        if (isect) {
-            if (i == 0) {
-                sample.normal = isect->normal;
-                sample.albedo = isect->color;
-            }
-            sample.color *= isect->color;
-            if (isect->new_ray) {
-                current_ray = *(isect->new_ray);
-            }
-            else {
-                return sample;
-            }
-        }
-        else {
-            sample.color = Vec3(0.0f, 0.0f, 0.0f);
-            return sample;
-        }
+    // first sample is different, since we want to collect the normal and albedo
+    PixelSample pixel_sample;
+    auto isect = world.ray_intersect(r, sampler);
+    if (!isect) {
+        return pixel_sample;
+    }
+    pixel_sample.normal = isect->normal;
+    pixel_sample.albedo = isect->color;
+    if (!isect->new_ray || isect->pdf == 0.f) {
+        pixel_sample.color = isect->color;
+        return pixel_sample;
     }
 
-    sample.color = Vec3(0.0f, 0.0f, 0.0f);
-    return sample;
+    pixel_sample.color = (
+        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, world, sampler, bounces-1)
+    ) / isect->pdf;
+
+    return pixel_sample;
 }
 
 void render_pixels(
@@ -89,7 +102,7 @@ void render_pixels(
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
-            pixel += sample_pixel(r, world, max_bounces, sampler);
+            pixel += sample_pixel(r, world, sampler, max_bounces);
         }
         pixel /= float(n_samples);
 
@@ -146,6 +159,7 @@ RenderResult render(
         std::thread::hardware_concurrency(),
         1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
     );
+    // size_t n_threads = 1;
     std::cout << "Using " << n_threads << " threads" << std::endl;
     size_t end_index = 0;
     std::mutex mutex;
