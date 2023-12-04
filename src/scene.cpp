@@ -1,3 +1,6 @@
+#include <fstream>
+#include <vector>
+
 #include "scene.hpp"
 
 void error_function(void* userPtr, enum RTCError error, const char* str)
@@ -304,6 +307,90 @@ unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* 
         printf("Something went wrong when making sphere\n");
     }
     m_geom_data.push_back({ Shape::SPHERE, material });
+    rtcSetGeometryUserData(geom, &m_geom_data.back());
+
+    rtcCommitGeometry(geom);
+    unsigned int geom_id = rtcAttachGeometry(m_scene, geom);
+    rtcReleaseGeometry(geom);
+
+    return geom_id;
+}
+
+unsigned int Scene::add_obj(const std::string& filename, const Material* material) {
+    // for now, only supports triangle meshes
+    struct Vertex {
+        float x, y, z;
+    };
+    struct Face {
+        unsigned int a, b, c;
+    };
+    std::vector<Vertex> vertices;
+    std::vector<Face> faces;
+    // open file and read in vertices and faces
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cout << "Unable to open file" << std::endl;
+        return RTC_INVALID_GEOMETRY_ID;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.size() == 0) {
+            continue;
+        }
+        else if (line[0] == 'v') {
+            Vertex v;
+            std::sscanf(line.c_str(), "v %f %f %f", &v.x, &v.y, &v.z);
+            vertices.push_back(v);
+        }
+        else if (line[0] == 'f') {
+            Face f;
+            std::sscanf(line.c_str(), "f %u %u %u", &f.a, &f.b, &f.c);
+            faces.push_back(f);
+        }
+        else {
+            std::cout << "Unrecognized line: " << line << std::endl;
+        }
+    }
+    file.close();
+
+    RTCGeometry geom = rtcNewGeometry(
+        m_device,
+        RTC_GEOMETRY_TYPE_TRIANGLE
+    );
+    float* vertex_buf = static_cast<float*>(rtcSetNewGeometryBuffer(
+        geom,
+        RTC_BUFFER_TYPE_VERTEX,
+        0,
+        RTC_FORMAT_FLOAT3,
+        3 * sizeof(float),
+        vertices.size()
+    ));
+    unsigned int* indices = static_cast<unsigned int*>(rtcSetNewGeometryBuffer(
+        geom,
+        RTC_BUFFER_TYPE_INDEX,
+        0,
+        RTC_FORMAT_UINT3,
+        3 * sizeof(unsigned int),
+        faces.size()
+    ));
+
+    if (vertex_buf && indices) {
+        for (size_t i = 0; i < vertices.size(); i++) {
+            vertex_buf[i * 3 + 0] = vertices[i].x;
+            vertex_buf[i * 3 + 1] = vertices[i].y;
+            vertex_buf[i * 3 + 2] = vertices[i].z;
+        }
+        for (size_t i = 0; i < faces.size(); i++) {
+            indices[i * 3 + 0] = faces[i].a - 1;
+            indices[i * 3 + 1] = faces[i].b - 1;
+            indices[i * 3 + 2] = faces[i].c - 1;
+        }
+    }
+    else {
+        printf("Something went wrong when making obj\n");
+    }
+
+    m_geom_data.push_back({ Shape::OBJ, material });
     rtcSetGeometryUserData(geom, &m_geom_data.back());
 
     rtcCommitGeometry(geom);

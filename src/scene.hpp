@@ -5,6 +5,7 @@
 #include <iostream>
 #include <limits>
 #include <optional>
+#include <string>
 
 #include <embree4/rtcore.h>
 
@@ -24,7 +25,8 @@ struct SceneIntersection : ScatterEvent {
 enum Shape {
     SPHERE,
     TRIANGLE,
-    QUAD
+    QUAD,
+    OBJ
 };
 
 struct GeometryData {
@@ -67,6 +69,8 @@ public:
     unsigned int add_quad(const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d, const Material* material);
     // plane is just a large square quad centered around the given point
     unsigned int add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
+
+    unsigned int add_obj(const std::string& filename, const Material* material);
 
     std::optional<const GeometryData*> get_geom_data(unsigned int geom_id) const {
         const void* ptr = rtcGetGeometryUserDataFromScene(m_scene, geom_id);
