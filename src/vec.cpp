@@ -100,6 +100,14 @@ Vec3 Vec3::cross(const Vec3 &v2) const {
     );
 }
 
+std::array<float, 4> Vec3::to_homog() const {
+    return {x, y, z, 0};
+}
+
+Vec3 Vec3::from_homog(const std::array<float, 4> &v) {
+    return Vec3(v[0], v[1], v[2]);
+}
+
 // ray operations
 
 Vec3 Vec3::reflect(const Vec3 &normal) const {
@@ -142,6 +150,14 @@ Pt3& Pt3::operator-=(const Vec3 &v2) {
     y -= v2.y;
     z -= v2.z;
     return *this;
+}
+
+std::array<float, 4> Pt3::to_homog() const {
+    return {x, y, z, 1};
+}
+
+Pt3 Pt3::from_homog(const std::array<float, 4> &v) {
+    return Pt3(v[0] / v[3], v[1] / v[3], v[2] / v[3]);
 }
 
 

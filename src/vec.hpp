@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 class Vec3 {
 public:
     Vec3() : x(0), y(0), z(0) {}
@@ -52,6 +54,9 @@ public:
 
     Vec3 cross(const Vec3 &v2) const;
 
+    std::array<float, 4> to_homog() const;
+    static Vec3 from_homog(const std::array<float, 4> &v);
+
     // ray operations
 
     Vec3 reflect(const Vec3 &normal) const;
@@ -82,6 +87,9 @@ public:
 
     Pt3 operator-(const Vec3 &v2) const;
     Pt3& operator-=(const Vec3 &v2);
+
+    std::array<float, 4> to_homog() const;
+    static Pt3 from_homog(const std::array<float, 4> &v);
 };
 
 

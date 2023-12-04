@@ -12,6 +12,7 @@ find_package(OpenImageDenoise 2.1 REQUIRED)
 find_package(embree 4.3 REQUIRED)
 
 add_library(lib
+    src/camera.cpp
     src/image.cpp
     src/random.cpp
     src/render.cpp
