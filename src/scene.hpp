@@ -1,10 +1,10 @@
 #pragma once
 
 #include <array>
+#include <deque>
 #include <iostream>
 #include <limits>
 #include <optional>
-#include <vector>
 
 #include <embree4/rtcore.h>
 
@@ -27,16 +27,22 @@ enum Shape {
     QUAD
 };
 
+struct GeometryData {
+    Shape shape;
+    const Material* material;
+};
+
 class Scene {
 public:
-    explicit Scene(RTCDevice&& device) : device(device), scene(rtcNewScene(device)) {}
+    explicit Scene(RTCDevice&& device) : m_device(device), m_scene(rtcNewScene(device)) {}
 
     ~Scene() {
-        rtcReleaseScene(scene);
-        rtcReleaseDevice(device);
+        rtcReleaseScene(m_scene);
+        rtcReleaseDevice(m_device);
     }
 
     void commit();
+    bool ready() const { return m_ready; }
 
     // intersect a single ray with the scene
     std::optional<SceneIntersection> ray_intersect(const Ray& ray, Sampler& sampler) const;
@@ -45,6 +51,12 @@ public:
         const std::array<Ray, 4>& rays,
         Sampler& sampler,
         const std::array<int, 4>& valid = { -1, -1, -1, -1 }
+    ) const;
+    // intersect a packet of 8 rays with the scene
+    std::array<std::optional<SceneIntersection>, 8> ray_intersect(
+        const std::array<Ray, 8>& rays,
+        Sampler& sampler,
+        const std::array<int, 8>& valid = { -1, -1, -1, -1, -1, -1, -1, -1 }
     ) const;
 
     // methods for adding shapes to scene; return geometry ID
@@ -56,11 +68,26 @@ public:
     // plane is just a large square quad centered around the given point
     unsigned int add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
 
-    bool ready = false;
+    std::optional<const GeometryData*> get_geom_data(unsigned int geom_id) const {
+        const void* ptr = rtcGetGeometryUserDataFromScene(m_scene, geom_id);
+        if (ptr == NULL) {
+            return std::nullopt;
+        }
+        return static_cast<const GeometryData*>(ptr);
+    }
+    RTCScene get_scene() const {
+        return m_scene;
+    }
+    RTCDevice get_device() const {
+        return m_device;
+    }
+
 
 private:
-    RTCScene scene;
-    RTCDevice device;
-    std::vector<const Material*> materials;
-    std::vector<Shape> shapes;
+    RTCScene m_scene;
+    RTCDevice m_device;
+    // need to store data in a collection that doesn't reallocate on resize
+    // since we'll be providing our geom objects with pointers to it
+    std::deque<GeometryData> m_geom_data;
+    bool m_ready = false;
 };

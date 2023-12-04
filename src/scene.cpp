@@ -18,8 +18,8 @@ RTCDevice initialize_device() {
 }
 
 void Scene::commit() {
-    rtcCommitScene(scene);
-    ready = true;
+    rtcCommitScene(m_scene);
+    m_ready = true;
 }
 
 Vec2 get_sphere_uv(const Vec3& n) {
@@ -37,7 +37,7 @@ Vec2 get_sphere_uv(const Vec3& n) {
 }
 
 std::optional<SceneIntersection> Scene::ray_intersect(const Ray& ray, Sampler& sampler) const {
-    RTCRayHit rayhit;
+    alignas(16) RTCRayHit rayhit;
     rayhit.ray.org_x = ray.o.x;
     rayhit.ray.org_y = ray.o.y;
     rayhit.ray.org_z = ray.o.z;
@@ -51,18 +51,22 @@ std::optional<SceneIntersection> Scene::ray_intersect(const Ray& ray, Sampler& s
     rayhit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
     rayhit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
 
-    rtcIntersect1(scene, &rayhit);
+    rtcIntersect1(m_scene, &rayhit);
 
     if (rayhit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return std::nullopt;
     }
 
+    auto geom_data = get_geom_data(rayhit.hit.geomID);
+    if (!geom_data) {
+        std::cout << "Geometry data not found for intersected object" << std::endl;
+        return std::nullopt;
+    }
     Vec3 normal = Vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
     Vec2 uv(rayhit.hit.u, rayhit.hit.v);
-
-    // embree doesn't have uv coordinates for spheres
-    // need to calculate this manually
-    if (shapes[rayhit.hit.geomID] == Shape::SPHERE) {
+    if ((*geom_data)->shape == Shape::SPHERE) {
+        // embree doesn't have uv coordinates for spheres
+        // need to calculate this manually
         uv = get_sphere_uv(normal);
     }
 
@@ -72,7 +76,7 @@ std::optional<SceneIntersection> Scene::ray_intersect(const Ray& ray, Sampler& s
         ray.at(rayhit.ray.tfar),
         ray.d.dot(normal) < 0.0f
     );
-    const Material* material = materials[rayhit.hit.geomID];
+    const Material* material = (*geom_data)->material;
 
     return SceneIntersection(
         material->scatter(ray, isect, sampler),
@@ -80,13 +84,9 @@ std::optional<SceneIntersection> Scene::ray_intersect(const Ray& ray, Sampler& s
     );
 }
 
-std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
-    const std::array<Ray, 4>& rays,
-    Sampler& sampler,
-    const std::array<int, 4>& valid
-) const {
-    RTCRayHit4 rayhits;
-    for (size_t i = 0; i < 4; i++) {
+template <typename RHN, size_t N>
+void build_rayhits(RHN& rayhits, const std::array<Ray, N>& rays, const std::array<int, N>& valid) {
+    for (size_t i = 0; i < N; i++) {
         if (valid[i] == 0) {
             continue;
         }
@@ -103,20 +103,33 @@ std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
         rayhits.hit.geomID[i] = RTC_INVALID_GEOMETRY_ID;
         rayhits.hit.instID[0][i] = RTC_INVALID_GEOMETRY_ID;
     }
+}
 
-    rtcIntersect4(valid.data(), scene, &rayhits);
-
-    std::array<std::optional<SceneIntersection>, 4> result;
-    for (size_t i = 0; i < 4; i++) {
+template <typename RHN, size_t N>
+std::array<std::optional<SceneIntersection>, N> rayhit_result(
+    const Scene* scene,
+    const RHN& rayhits,
+    const std::array<Ray, N>& rays,
+    const std::array<int, N>& valid,
+    Sampler& sampler
+) {
+    std::array<std::optional<SceneIntersection>, N> result;
+    for (size_t i = 0; i < N; i++) {
         if (valid[i] == 0) {
             continue;
         }
-        if (rayhits.hit.geomID[i] == RTC_INVALID_GEOMETRY_ID) {
+        auto geom_id = rayhits.hit.geomID[i];
+        if (geom_id == RTC_INVALID_GEOMETRY_ID) {
+            continue;
+        }
+        auto geom_data = scene->get_geom_data(geom_id);
+        if (!geom_data) {
+            std::cout << "Geometry data not found for intersected object" << std::endl;
             continue;
         }
         Vec3 normal = Vec3(rayhits.hit.Ng_x[i], rayhits.hit.Ng_y[i], rayhits.hit.Ng_z[i]).normalize();
         Vec2 uv(rayhits.hit.u[i], rayhits.hit.v[i]);
-        if (shapes[rayhits.hit.geomID[i]] == Shape::SPHERE) {
+        if ((*geom_data)->shape == Shape::SPHERE) {
             uv = get_sphere_uv(normal);
         }
         ShapeIntersection isect(
@@ -125,7 +138,7 @@ std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
             rays[i].at(rayhits.ray.tfar[i]),
             rays[i].d.dot(normal) < 0.0f
         );
-        const Material* material = materials[rayhits.hit.geomID[i]];
+        const Material* material = (*geom_data)->material;
         result[i] = SceneIntersection(
             material->scatter(rays[i], isect, sampler),
             normal
@@ -135,9 +148,31 @@ std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
     return result;
 }
 
+std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
+    const std::array<Ray, 4>& rays,
+    Sampler& sampler,
+    const std::array<int, 4>& valid
+) const {
+    alignas(16) RTCRayHit4 rayhits;
+    build_rayhits(rayhits, rays, valid);
+    rtcIntersect4(valid.data(), m_scene, &rayhits);
+    return rayhit_result(this, rayhits, rays, valid, sampler);
+}
+
+std::array<std::optional<SceneIntersection>, 8> Scene::ray_intersect(
+    const std::array<Ray, 8>& rays,
+    Sampler& sampler,
+    const std::array<int, 8>& valid
+) const {
+    alignas(32) RTCRayHit8 rayhits;
+    build_rayhits(rayhits, rays, valid);
+    rtcIntersect8(valid.data(), m_scene, &rayhits);
+    return rayhit_result(this, rayhits, rays, valid, sampler);
+}
+
 unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material) {
     RTCGeometry geom = rtcNewGeometry(
-        device,
+        m_device,
         RTC_GEOMETRY_TYPE_TRIANGLE
     );
     float* vertices = static_cast<float*>(rtcSetNewGeometryBuffer(
@@ -169,16 +204,12 @@ unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const
     else {
         printf("Something went wrong when making triangle\n");
     }
+    m_geom_data.push_back({ Shape::TRIANGLE, material });
+    rtcSetGeometryUserData(geom, &m_geom_data.back());
 
     rtcCommitGeometry(geom);
-    unsigned int geom_id = rtcAttachGeometry(scene, geom);
+    unsigned int geom_id = rtcAttachGeometry(m_scene, geom);
     rtcReleaseGeometry(geom);
-
-    materials.push_back(material);
-    if (materials.size() != geom_id + 1) {
-        std::cout << "Mismatch between materials and geom_ids" << std::endl;
-    }
-    shapes.push_back(Shape::TRIANGLE);
 
     return geom_id;
 }
@@ -191,7 +222,7 @@ unsigned int Scene::add_quad(
     const Material* material
 ) {
     RTCGeometry geom = rtcNewGeometry(
-        device,
+        m_device,
         RTC_GEOMETRY_TYPE_QUAD
     );
     float* vertices = static_cast<float*>(rtcSetNewGeometryBuffer(
@@ -225,16 +256,14 @@ unsigned int Scene::add_quad(
     else {
         printf("Something went wrong when making quad\n");
     }
+    m_geom_data.push_back({ Shape::QUAD, material });
+    rtcSetGeometryUserData(geom, &m_geom_data.back());
 
     rtcCommitGeometry(geom);
-    unsigned int geom_id = rtcAttachGeometry(scene, geom);
+    unsigned int geom_id = rtcAttachGeometry(m_scene, geom);
     rtcReleaseGeometry(geom);
 
-    materials.push_back(material);
-    if (materials.size() != geom_id + 1) {
-        std::cout << "Mismatch between materials and geom_ids" << std::endl;
-    }
-    shapes.push_back(Shape::QUAD);
+    auto x = get_geom_data(geom_id);
 
     return geom_id;
 }
@@ -253,7 +282,7 @@ unsigned int Scene::add_plane(const Pt3& p, const Vec3& n, const Material* mater
 
 unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* material) {
     RTCGeometry geom = rtcNewGeometry(
-        device,
+        m_device,
         RTC_GEOMETRY_TYPE_SPHERE_POINT
     );
     float* vertices = static_cast<float*>(rtcSetNewGeometryBuffer(
@@ -274,16 +303,12 @@ unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* 
     else {
         printf("Something went wrong when making sphere\n");
     }
+    m_geom_data.push_back({ Shape::SPHERE, material });
+    rtcSetGeometryUserData(geom, &m_geom_data.back());
 
     rtcCommitGeometry(geom);
-    unsigned int geom_id = rtcAttachGeometry(scene, geom);
+    unsigned int geom_id = rtcAttachGeometry(m_scene, geom);
     rtcReleaseGeometry(geom);
-
-    materials.push_back(material);
-    if (materials.size() != geom_id + 1) {
-        std::cout << "Mismatch between materials and geom_ids" << std::endl;
-    }
-    shapes.push_back(Shape::SPHERE);
 
     return geom_id;
 }

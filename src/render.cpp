@@ -7,8 +7,8 @@
 
 #include "render.hpp"
 
-// #define USE_RAY_PACKETS
 #define MULTITHREADED
+#define PACKET_SIZE 4
 
 const size_t THREAD_JOB_SIZE = 4096;
 
@@ -79,21 +79,22 @@ PixelSample sample_pixel(
     return pixel_sample;
 }
 
-std::array<Vec3, 4> sample_pixel_inner(
-    const std::array<Ray, 4>& rays,
-    const std::array<int, 4>& valid,
+template <size_t N>
+std::array<Vec3, N> sample_pixel_inner(
+    const std::array<Ray, N>& rays,
+    const std::array<int, N>& valid,
     const Scene& scene,
     Sampler& sampler,
     size_t bounces
 ) {
-    std::array<Vec3, 4> samples;
+    std::array<Vec3, N> samples;
     if (bounces == 0) {
         return samples;
     }
     auto isects = scene.ray_intersect(rays, sampler, valid);
-    std::array<Ray, 4> new_rays;
-    std::array<int, 4> new_valid = {0, 0, 0, 0};
-    for (size_t i = 0; i < 4; i++) {
+    std::array<Ray, N> new_rays;
+    std::array<int, N> new_valid{};
+    for (size_t i = 0; i < N; i++) {
         if (valid[i] == 0 || !isects[i]) {
             continue;
         }
@@ -105,7 +106,7 @@ std::array<Vec3, 4> sample_pixel_inner(
         new_valid[i] = -1;
     }
     bool exit = true;
-    for (size_t i = 0; i < 4; i++) {
+    for (size_t i = 0; i < N; i++) {
         if (new_valid[i] != 0) {
             exit = false;
             break;
@@ -115,7 +116,7 @@ std::array<Vec3, 4> sample_pixel_inner(
         return samples;
     }
     auto inner_samples = sample_pixel_inner(new_rays, new_valid, scene, sampler, bounces-1);
-    for (size_t i = 0; i < 4; i++) {
+    for (size_t i = 0; i < N; i++) {
         if (new_valid[i] == 0) {
             continue;
         }
@@ -126,20 +127,21 @@ std::array<Vec3, 4> sample_pixel_inner(
     return samples;
 }
 
-std::array<PixelSample, 4> sample_pixel(
-    const std::array<Ray, 4>& rays,
+template <size_t N>
+std::array<PixelSample, N> sample_pixel(
+    const std::array<Ray, N>& rays,
     const Scene& scene,
     Sampler& sampler,
     size_t bounces
 ) {
-    std::array<PixelSample, 4> pixel_samples;
+    std::array<PixelSample, N> pixel_samples;
     // valid = -1 means we want to continue tracing this ray
     // valid = 0 means we want to stop tracing this ray
     // this is just based on embree syntax for rtcIntersect4/8/16
-    std::array<Ray, 4> new_rays;
-    std::array<int, 4> valid = { 0, 0, 0, 0};
+    std::array<Ray, N> new_rays;
+    std::array<int, N> valid{};
     auto isects = scene.ray_intersect(rays, sampler);
-    for (size_t i = 0; i < 4; i++) {
+    for (size_t i = 0; i < N; i++) {
         if (!isects[i]) {
             continue;
         }
@@ -153,7 +155,7 @@ std::array<PixelSample, 4> sample_pixel(
         valid[i] = -1;
     }
     bool exit = true;
-    for (size_t i = 0; i < 4; i++) {
+    for (size_t i = 0; i < N; i++) {
         if (valid[i] != 0) {
             exit = false;
             break;
@@ -164,7 +166,7 @@ std::array<PixelSample, 4> sample_pixel(
     }
     
     auto inner_samples = sample_pixel_inner(new_rays, valid, scene, sampler, bounces-1);
-    for (size_t i = 0; i < 4; i++) {
+    for (size_t i = 0; i < N; i++) {
         pixel_samples[i].color = (
             isects[i]->color * isects[i]->pdf * inner_samples[i]
         ) / isects[i]->pdf;
@@ -175,7 +177,7 @@ std::array<PixelSample, 4> sample_pixel(
 
 void render_pixels(
     const Camera& camera,
-    const Scene& world,
+    const Scene& scene,
     size_t n_samples,
     size_t max_bounces,
     RenderResult& result,
@@ -194,20 +196,20 @@ void render_pixels(
         size_t y = camera.image_height - i / camera.image_width - 1;
 
         PixelSample pixel{};
-        #ifdef USE_RAY_PACKETS
-        size_t n_chunks = n_samples / 4;
-        size_t rem  = n_samples % 4;
+        #ifdef PACKET_SIZE
+        size_t n_chunks = n_samples / PACKET_SIZE;
+        size_t rem  = n_samples % PACKET_SIZE;
         for (size_t chunk = 0; chunk < n_chunks; chunk++) {
-            std::array<Ray, 4> rays;
-            for (size_t ss = 0; ss < 4; ss++) {
-                sampler.set_sample_index(chunk * 4 + ss);
+            std::array<Ray, PACKET_SIZE> rays;
+            for (size_t ss = 0; ss < PACKET_SIZE; ss++) {
+                sampler.set_sample_index(chunk * PACKET_SIZE + ss);
                 auto jitter = sampler.sample_2d();
                 float u = float(x) + jitter.x;
                 float v = float(y) + jitter.y;
                 rays[ss] = camera.cast_ray(u, v); 
             }
-            std::array<PixelSample, 4> samples = sample_pixel(rays, world, sampler, max_bounces);
-            for (size_t s = 0; s < 4; s++) {
+            std::array<PixelSample, PACKET_SIZE> samples = sample_pixel(rays, scene, sampler, max_bounces);
+            for (size_t s = 0; s < PACKET_SIZE; s++) {
                 pixel += samples[s];
             }
         }
@@ -217,7 +219,7 @@ void render_pixels(
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
-            pixel += sample_pixel(r, world, sampler, max_bounces);
+            pixel += sample_pixel(r, scene, sampler, max_bounces);
         }
         #else
         for (size_t s = 0; s < n_samples; s++) {
@@ -226,7 +228,7 @@ void render_pixels(
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
-            pixel += sample_pixel(r, world, sampler, max_bounces);
+            pixel += sample_pixel(r, scene, sampler, max_bounces);
         }
         #endif
         pixel /= float(n_samples);
@@ -255,7 +257,7 @@ void render_pixels(
     }
     render_pixels(
         camera,
-        world,
+        scene,
         n_samples,
         max_bounces,
         result,
@@ -273,10 +275,21 @@ RenderResult render(
     size_t max_bounces
 ) {
     RenderResult result(camera.image_height, camera.image_width);
-    if (!scene.ready) {
+    if (!scene.ready()) {
         std::cout << "Scene must be committed before rendering." << std::endl;
         return result;
     }
+
+    // check that ray packet size is compatible with machine
+    #if PACKET_SIZE == 4
+    if (rtcGetDeviceProperty(scene.get_device(), RTC_DEVICE_PROPERTY_NATIVE_RAY4_SUPPORTED) == 0) {
+        std::cout << "Warning: packet size 4 selected but not supported" << std::endl;
+    }
+    #elif PACKET_SIZE == 8
+    if (rtcGetDeviceProperty(scene.get_device(), RTC_DEVICE_PROPERTY_NATIVE_RAY8_SUPPORTED) == 0) {
+        std::cout << "Warning: packet size 8 selected but not supported" << std::endl;
+    }
+    #endif
     
     std::vector<std::thread> threads;
     size_t image_size = result.width * result.height;
