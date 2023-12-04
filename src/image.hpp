@@ -10,9 +10,9 @@ public:
 
     Image(std::vector<float>&& buffer, size_t height, size_t width) : width(width), height(height), color_buffer(buffer) {}
 
-    void save(const std::string& filename) const;
+    void save(const std::string& filename, float gamma = 0.43) const;
 
-    virtual void denoise();
+    virtual void denoise(bool verbose = false);
 
     size_t height;
     size_t width;
@@ -31,7 +31,7 @@ public:
         size_t width
     ) : Image(std::move(color_buffer), height, width) {}
 
-    virtual void denoise() override;
+    virtual void denoise(bool verbose = false) override;
 
     std::vector<float> normal_buffer;
     std::vector<float> albedo_buffer;

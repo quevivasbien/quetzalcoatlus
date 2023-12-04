@@ -18,10 +18,18 @@ public:
 
     void set_sample_index(uint32_t index);
 
-    Vec3 sample_unit_sphere();
-
-    Vec3 sample_within_unit_sphere() {
-        return sample_unit_sphere() * sample_1d();
+    Vec2 sample_uniform_disk();
+    Vec3 sample_uniform_hemisphere();
+    float uniform_hemisphere_pdf() {
+        return 0.5 * M_1_PI;
+    }
+    Vec3 sample_uniform_sphere();
+    float uniform_sphere_pdf() {
+        return 0.25 * M_1_PI;
+    }
+    Vec3 sample_cosine_hemisphere();
+    float cosine_hemisphere_pdf(float cos_theta) {
+        return cos_theta * M_1_PI;
     }
 
     std::mt19937 rng;
