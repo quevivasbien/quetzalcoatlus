@@ -20,3 +20,4 @@ add_library(lib
 target_link_libraries(lib ${OpenCV_LIBS} ${OIDN_DIR}/lib/libOpenImageDenoise.so)
 
 add_subdirectory(examples)
+add_subdirectory(src/color)
