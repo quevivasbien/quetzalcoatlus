@@ -27,3 +27,4 @@ target_link_libraries(lib
 )
 
 add_subdirectory(examples)
+add_subdirectory(src/color)
