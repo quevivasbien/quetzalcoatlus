@@ -1,3 +1,5 @@
+#pragma once
+
 #include <array>
 #include <cstddef>
 #include <memory>
@@ -55,7 +57,12 @@ template <size_t N>
 class SpectrumSample {
 public:
     SpectrumSample(
-        float c, const std::shared_ptr<WavelengthSample<N>>& wavelengths
+        std::array<float, N>&& values,
+        const std::shared_ptr<const WavelengthSample<N>>& wavelengths
+    ) : m_values(std::move(values)), m_wavelengths(wavelengths) {}
+    
+    SpectrumSample(
+        float c, const std::shared_ptr<const WavelengthSample<N>>& wavelengths
     ) : m_wavelengths(wavelengths) {
         m_values.fill(c);
     }
@@ -146,6 +153,14 @@ public:
         return *this;
     }
 
+    float average() const {
+        float sum = 0.0f;
+        for (size_t i = 0; i < N; ++i) {
+            sum += m_values[i];
+        }
+        return sum / N;
+    }
+
     // pointwise map
     template <typename F>
     SpectrumSample<N> map(F&& f) const {
@@ -163,8 +178,16 @@ public:
         }
     }
 
+    // construct new spectrum from wavelengths pdf
+    SpectrumSample<N> new_from_pdf() {
+        return SpectrumSample<N>(
+            m_wavelengths->m_pdf,
+            m_wavelengths
+        );
+    }
+
 private:
     std::array<float, N> m_values;
-    std::shared_ptr<WavelengthSample> m_wavelengths;
+    std::shared_ptr<const WavelengthSample> m_wavelengths;
 };
 

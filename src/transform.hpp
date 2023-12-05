@@ -1,8 +1,91 @@
+#pragma once
+
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 
 #include "vec.hpp"
+
+struct Mat3 {
+    // data is stored in row-major order
+    std::array<float, 9> data;
+
+    Mat3() {};
+    explicit Mat3(std::array<float, 9>&& data) : data(std::move(data)) {}
+
+    float operator[] (size_t i) const { return data[i]; }
+    float& operator[] (size_t i) { return data[i]; }
+
+    Mat3 operator* (const Mat3& other) const {
+        Mat3 result;
+        for (size_t i = 0; i < 3; i++) {
+            for (size_t j = 0; j < 3; j++) {
+                result[i * 3 + j] = 0;
+                for (size_t k = 0; k < 3; k++) {
+                    result[i * 3 + j] += data[i * 3 + k] * other[k * 3 + j];
+                }
+            }
+        }
+        return result;
+    }
+
+    std::array<float, 3> operator* (const std::array<float, 3>& v) const {
+        std::array<float, 3> result;
+        for (size_t i = 0; i < 3; i++) {
+            result[i] = 0;
+            for (size_t j = 0; j < 3; j++) {
+                result[i] += data[i * 3 + j] * v[j];
+            }
+        }
+        return result;
+    }
+
+    Vec3 operator* (const Vec3& v) const {
+        return Vec3(data[0] * v.x + data[3] * v.y + data[6] * v.z,
+                    data[1] * v.x + data[4] * v.y + data[7] * v.z,
+                    data[2] * v.x + data[5] * v.y + data[8] * v.z);
+    }
+
+    // gets the inverse of the matrix, or returns nullopt if the matrix is not invertible (or nearly so)
+    // this is not a particularly good algorithm, but it works fine when performance and numerical precision aren't top priorities
+    std::optional<Mat3> invert() const {
+        Mat3 result;
+        float invdet = (data[0] * (data[4] * data[8] - data[5] * data[7]) -
+                        data[1] * (data[3] * data[8] - data[5] * data[6]) +
+                        data[2] * (data[3] * data[7] - data[4] * data[6]));
+        if (std::abs(invdet) < 1e-8f) {
+            return std::nullopt;
+        }
+        float det = 1.0f / invdet;
+        result[0] = (data[4] * data[8] - data[5] * data[7]) * det;
+        result[1] = (data[2] * data[7] - data[1] * data[8]) * det;
+        result[2] = (data[1] * data[5] - data[4] * data[2]) * det;
+        result[3] = (data[5] * data[6] - data[3] * data[8]) * det;
+        result[4] = (data[0] * data[8] - data[2] * data[6]) * det;
+        result[5] = (data[2] * data[3] - data[0] * data[5]) * det;
+        result[6] = (data[3] * data[7] - data[6] * data[4]) * det;
+        result[7] = (data[1] * data[6] - data[0] * data[7]) * det;
+        result[8] = (data[0] * data[4] - data[1] * data[3]) * det;
+        return result;
+    }
+
+    static Mat3 identity() {
+        Mat3 result{};
+        result[0] = 1;
+        result[4] = 1;
+        result[8] = 1;
+        return result;
+    }
+
+    static Mat3 diagonal(const std::array<float, 3>& v) {
+        Mat3 result{};
+        result[0] = v[0];
+        result[4] = v[1];
+        result[8] = v[2];
+        return result;
+    }
+};
 
 struct Mat4 {
     // data is stored in row-major order

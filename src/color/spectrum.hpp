@@ -1,4 +1,9 @@
+#pragma once
+
 #include <vector>
+
+#include "spectrum_sample.hpp"
+
 
 const int LAMBDA_MIN = 360;
 const int LAMBDA_MAX = 830;
@@ -6,6 +11,23 @@ const int LAMBDA_MAX = 830;
 class Spectrum {
 public:
     virtual float operator()(float lambda) const = 0;
+
+    float inner_product(const Spectrum& other) const {
+        float sum = 0.0f;
+        for (int l = LAMBDA_MIN; l <= LAMBDA_MAX; ++l) {
+            sum += (*this)(l) * other(l);
+        }
+        return sum;
+    }
+
+    template <size_t N>
+    SpectrumSample<N> sample(const std::shared_ptr<const WavelengthSample<N>>& wavelengths) const {
+        std::array<float, N> values;
+        for (size_t i = 0; i < N; i++) {
+            values[i] = (*this)(wavelengths->m_lambdas[i]);
+        }
+        return SpectrumSample<N>(std::move(values), wavelengths);
+    }
 };
 
 class DenselySampledSpectrum : public Spectrum {
@@ -51,10 +73,3 @@ private:
     float m_t;
     float m_normalization_factor;
 };
-
-
-namespace spectra {
-    const DenselySampledSpectrum& X();
-    const DenselySampledSpectrum& Y();
-    const DenselySampledSpectrum& Z();
-}
