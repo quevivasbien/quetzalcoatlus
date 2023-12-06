@@ -44,13 +44,18 @@ void WavelengthSample::terminate_secondary() {
     m_pdf[0] /= N_SPECTRUM_SAMPLES;
 }
 
+bool WavelengthSample::operator==(const WavelengthSample& other) const {
+    return m_lambdas == other.m_lambdas && m_pdf == other.m_pdf;
+}
+
+
 SpectrumSample SpectrumSample::from_spectrum(
     const Spectrum& spectrum,
-    std::shared_ptr<const WavelengthSample> wavelengths
+    const WavelengthSample& wavelengths
 ) {
     SampleArray values;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; i++) {
-        values[i] = spectrum(wavelengths->m_lambdas[i]);
+        values[i] = spectrum(wavelengths.m_lambdas[i]);
     }
     return SpectrumSample(std::move(values), wavelengths);
 }
@@ -63,6 +68,7 @@ bool SpectrumSample::is_zero() const {
     }
     return true;
 }
+
 
 SpectrumSample SpectrumSample::operator+(const SpectrumSample& other) const {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
@@ -141,6 +147,66 @@ SpectrumSample& SpectrumSample::operator/=(const SpectrumSample& other) {
     return *this;
 }
 
+SpectrumSample SpectrumSample::operator+(float c) const {
+    SampleArray values;
+    for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
+        values[i] = m_values[i] + c;
+    }
+    return SpectrumSample(std::move(values), m_wavelengths);
+}
+
+SpectrumSample& SpectrumSample::operator+=(float c) {
+    for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
+        m_values[i] += c;
+    }
+    return *this;
+}
+
+SpectrumSample SpectrumSample::operator-(float c) const {
+    SampleArray values;
+    for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
+        values[i] = m_values[i] - c;
+    }
+    return SpectrumSample(std::move(values), m_wavelengths);
+}
+
+SpectrumSample& SpectrumSample::operator-=(float c) {
+    for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
+        m_values[i] -= c;
+    }
+    return *this;
+}
+
+SpectrumSample SpectrumSample::operator*(float c) const {
+    SampleArray values;
+    for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
+        values[i] = m_values[i] * c;
+    }
+    return SpectrumSample(std::move(values), m_wavelengths);
+}
+
+SpectrumSample& SpectrumSample::operator*=(float c) {
+    for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
+        m_values[i] *= c;
+    }
+    return *this;
+}
+
+SpectrumSample SpectrumSample::operator/(float c) const {
+    SampleArray values;
+    for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
+        values[i] = m_values[i] / c;
+    }
+    return SpectrumSample(std::move(values), m_wavelengths);
+}
+
+SpectrumSample& SpectrumSample::operator/=(float c) {
+    for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
+        m_values[i] /= c;
+    }
+    return *this;
+}
+
 float SpectrumSample::average() const {
     float sum = 0.0f;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
@@ -151,10 +217,10 @@ float SpectrumSample::average() const {
 
 
 // construct new spectrum from wavelengths pdf
-SpectrumSample SpectrumSample::new_from_pdf() const {
-    auto pdf = m_wavelengths->m_pdf;
+SpectrumSample SpectrumSample::from_wavelengths(const WavelengthSample& wavelengths) {
+    auto pdf = wavelengths.m_pdf;
     return SpectrumSample(
         std::move(pdf),
-        m_wavelengths
+        wavelengths
     );
 }

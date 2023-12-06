@@ -23,6 +23,8 @@ public:
 
     void terminate_secondary();
 
+    bool operator==(const WavelengthSample& other) const;
+
     SampleArray m_lambdas;
     SampleArray m_pdf;
 };
@@ -34,16 +36,16 @@ public:
 
     SpectrumSample(
         SampleArray&& values,
-        const std::shared_ptr<const WavelengthSample>& wavelengths
+        const WavelengthSample& wavelengths
     ) : m_values(std::move(values)), m_wavelengths(wavelengths) {}
     
     SpectrumSample(
-        float c, const std::shared_ptr<const WavelengthSample>& wavelengths
+        float c, const WavelengthSample& wavelengths
     ) : m_wavelengths(wavelengths) {
         m_values.fill(c);
     }
 
-    static SpectrumSample from_spectrum(const Spectrum& spectrum, std::shared_ptr<const WavelengthSample> wavelengths);
+    static SpectrumSample from_spectrum(const Spectrum& spectrum, const WavelengthSample& wavelengths);
 
     float operator[](size_t i) const { return m_values[i]; }
     float& operator[](size_t i) { return m_values[i]; }
@@ -59,6 +61,15 @@ public:
     SpectrumSample& operator*=(const SpectrumSample& other);
     SpectrumSample operator/(const SpectrumSample& other) const;
     SpectrumSample& operator/=(const SpectrumSample& other);
+
+    SpectrumSample operator+(float c) const;
+    SpectrumSample& operator+=(float c);
+    SpectrumSample operator-(float c) const;
+    SpectrumSample& operator-=(float c);
+    SpectrumSample operator*(float c) const;
+    SpectrumSample& operator*=(float c);
+    SpectrumSample operator/(float c) const;
+    SpectrumSample& operator/=(float c);
 
     float average() const;
 
@@ -80,9 +91,9 @@ public:
     }
 
     // construct new spectrum from wavelengths pdf
-    SpectrumSample new_from_pdf() const;
+    static SpectrumSample from_wavelengths(const WavelengthSample& wavelengths);
 
     SampleArray m_values;
-    std::shared_ptr<const WavelengthSample> m_wavelengths;
+    WavelengthSample m_wavelengths;
 };
 

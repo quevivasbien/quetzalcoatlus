@@ -5,6 +5,7 @@
 #include <thread>
 #include <vector>
 
+#include "color/color.hpp"
 #include "render.hpp"
 
 #define MULTITHREADED
@@ -13,54 +14,58 @@
 const size_t THREAD_JOB_SIZE = 4096;
 
 struct PixelSample {
-    Vec3 color;
+    SpectrumSample color;
     Vec3 normal;
-    Vec3 albedo;
+    SpectrumSample albedo;
 
-    PixelSample() : color(0.0f, 0.0f, 0.0f), normal(0.0f, 0.0f, 0.0f), albedo(0.0f, 0.0f, 0.0f) {}
+    explicit PixelSample(const WavelengthSample& wavelengths) : color(0.0f, wavelengths), normal(0.0f, 0.0f, 0.0f), albedo(0.0f, wavelengths) {}
 
-    void operator+=(const PixelSample& other) {
+    PixelSample& operator+=(const PixelSample& other) {
         color += other.color;
         normal += other.normal;
         albedo += other.albedo;
+        return *this;
     }
 
-    void operator/=(float c) {
+    PixelSample& operator/=(float c) {
         color /= c;
         normal /= c;
         albedo /= c;
+        return *this;
     }
 };
 
-Vec3 sample_pixel_inner(
+SpectrumSample sample_pixel_inner(
     const Ray& r,
     const Scene& scene,
+    const WavelengthSample& wavelengths,
     Sampler& sampler,
     size_t bounces
 ) {
     if (bounces == 0) {
-        return Vec3(0.0f, 0.0f, 0.0f);
+        return SpectrumSample(0.0f, wavelengths);
     }
     auto isect = scene.ray_intersect(r, sampler);
     if (!isect) {
-        return Vec3(0.0f, 0.0f, 0.0f);
+        return SpectrumSample(0.0f, wavelengths);
     }
     if (!isect->new_ray || isect->pdf == 0.f) {
         return isect->color;
     }
     
     return (
-        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, sampler, bounces-1)
+        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, wavelengths, sampler, bounces-1)
     ) / isect->pdf;
 }
 
 PixelSample sample_pixel(
     const Ray& r,
     const Scene& scene,
+    const WavelengthSample& wavelengths,
     Sampler& sampler,
     size_t bounces
 ) {
-    PixelSample pixel_sample;
+    PixelSample pixel_sample(wavelengths);
     auto isect = scene.ray_intersect(r, sampler);
     if (!isect) {
         return pixel_sample;
@@ -73,7 +78,7 @@ PixelSample sample_pixel(
     }
 
     pixel_sample.color = (
-        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, sampler, bounces-1)
+        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, wavelengths, sampler, bounces-1)
     ) / isect->pdf;
 
     return pixel_sample;
@@ -84,6 +89,7 @@ std::array<Vec3, N> sample_pixel_inner(
     const std::array<Ray, N>& rays,
     const std::array<int, N>& valid,
     const Scene& scene,
+    const WavelengthSample& wavelengths,
     Sampler& sampler,
     size_t bounces
 ) {
@@ -115,7 +121,13 @@ std::array<Vec3, N> sample_pixel_inner(
     if (exit) {
         return samples;
     }
-    auto inner_samples = sample_pixel_inner(new_rays, new_valid, scene, sampler, bounces-1);
+    auto inner_samples = sample_pixel_inner(
+        new_rays, new_valid,
+        scene,
+        wavelengths,
+        sampler,
+        bounces-1
+    );
     for (size_t i = 0; i < N; i++) {
         if (new_valid[i] == 0) {
             continue;
@@ -131,6 +143,7 @@ template <size_t N>
 std::array<PixelSample, N> sample_pixel(
     const std::array<Ray, N>& rays,
     const Scene& scene,
+    const WavelengthSample& wavelengths,
     Sampler& sampler,
     size_t bounces
 ) {
@@ -165,7 +178,13 @@ std::array<PixelSample, N> sample_pixel(
         return pixel_samples;
     }
     
-    auto inner_samples = sample_pixel_inner(new_rays, valid, scene, sampler, bounces-1);
+    auto inner_samples = sample_pixel_inner(
+        new_rays, valid,
+        scene,
+        wavelengths,
+        sampler,
+        bounces-1
+    );
     for (size_t i = 0; i < N; i++) {
         pixel_samples[i].color = (
             isects[i]->color * isects[i]->pdf * inner_samples[i]
@@ -195,7 +214,9 @@ void render_pixels(
         size_t x = i % camera.image_width;
         size_t y = camera.image_height - i / camera.image_width - 1;
 
-        PixelSample pixel{};
+        Vec3 color{};
+        Vec3 normal{};
+        Vec3 albedo{};
         #ifdef PACKET_SIZE
         size_t n_chunks = n_samples / PACKET_SIZE;
         size_t rem  = n_samples % PACKET_SIZE;

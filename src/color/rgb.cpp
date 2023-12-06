@@ -166,3 +166,30 @@ std::shared_ptr<const RGBColorSpace> RGBColorSpace::sRGB() {
     }
     return space;
 }
+
+
+RGBUnboundedSpectrum::RGBUnboundedSpectrum(const RGBColorSpace& cs, RGB rgb) {
+    m_scale = 2 * std::max({rgb.x, rgb.y, rgb.z});
+    RGB rgb_ = m_scale ? RGB(rgb / m_scale) : RGB(0, 0, 0);
+    m_polynomial = cs.to_spectrum(rgb_);
+}
+
+float RGBUnboundedSpectrum::operator()(float lambda) const {
+    return m_scale * m_polynomial(lambda);
+}
+
+
+RGBIlluminantSpectrum::RGBIlluminantSpectrum(
+    const RGBColorSpace& cs, RGB rgb
+) : m_illuminant(cs.m_illuminant) {
+    m_scale = 2 * std::max({rgb.x, rgb.y, rgb.z});
+    RGB rgb_ = m_scale ? RGB(rgb / m_scale) : RGB(0, 0, 0);
+    m_polynomial = cs.to_spectrum(rgb_);
+}
+
+float RGBIlluminantSpectrum::operator()(float lambda) const {
+    if (!m_illuminant) {
+        return 0.0f;
+    }
+    return m_scale * m_polynomial(lambda) * (*m_illuminant)(lambda);
+}
