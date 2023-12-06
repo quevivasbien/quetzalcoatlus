@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <optional>
 
+#include "ray.hpp"
 #include "vec.hpp"
 
 
@@ -42,6 +43,8 @@ struct Mat4 {
         0.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 0.0f}) {};
 
+    explicit Mat4(std::array<float, 16>&& data) : data(std::move(data)) {}
+
     float operator[] (size_t i) const { return data[i]; }
     float& operator[] (size_t i) { return data[i]; }
 
@@ -59,6 +62,10 @@ struct Mat4 {
 
     static Mat4 diagonal(const std::array<float, 4>& v);
 
+    static Mat4 rotate_x(float angle);
+    static Mat4 rotate_y(float angle);
+    static Mat4 rotate_z(float angle);
+    // rotation about a unit vector axis
     static Mat4 rotation(const Vec3& axis, float angle);
 };
 
@@ -70,20 +77,31 @@ public:
 
     Vec3 apply(const Vec3& v) const;
     Pt3 apply(const Pt3& p) const;
+    Ray apply(const Ray& r) const;
+
     Vec3 apply_inverse(const Vec3& v) const;
     Pt3 apply_inverse(const Pt3& v) const;
+    Ray apply_inverse(const Ray& r) const;
 
-    Vec3 operator* (const Vec3& v) const;
-    Pt3 operator* (const Pt3& p) const;
+    Transform apply(const Transform& t) const;
 
-    Transform operator* (const Transform& t) const;
+    template <typename T>
+    T operator*(const T& t) const {
+        return apply(t);
+    }
 
     static Transform identity();
 
     static Transform translation(const Vec3& v);
+    static Transform translation(float x, float y, float z);
 
     static Transform scale(const Vec3& v);
+    static Transform scale(float x, float y, float z);
+    static Transform scale(float c);
 
+    static Transform rotate_x(float angle);
+    static Transform rotate_y(float angle);
+    static Transform rotate_z(float angle);
     static Transform rotation(const Vec3& axis, float angle);
 
     Mat4 m_mat;

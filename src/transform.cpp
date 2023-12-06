@@ -15,9 +15,8 @@ Mat3 Mat3::operator* (const Mat3& other) const {
 }
 
 std::array<float, 3> Mat3::operator* (const std::array<float, 3>& v) const {
-    std::array<float, 3> result;
+    std::array<float, 3> result{};
     for (size_t i = 0; i < 3; i++) {
-        result[i] = 0;
         for (size_t j = 0; j < 3; j++) {
             result[i] += data[i * 3 + j] * v[j];
         }
@@ -33,10 +32,6 @@ Vec3 Mat3::operator* (const Vec3& v) const {
 
 // gets the inverse of the matrix, or returns nullopt if the matrix is not invertible (or nearly so)
 std::optional<Mat3> Mat3::invert() const {
-    // Matrix is
-    // 0/a 1/d 2/g
-    // 3/b 4/e 5/h
-    // 6/c 7/f 8/i
     Mat3 adj({
         data[4] * data[8] - data[5] * data[7],
         data[2] * data[7] - data[1] * data[8],
@@ -80,14 +75,11 @@ Mat3 Mat3::diagonal(const std::array<float, 3>& v) {
     return result;
 }
 
-// todo: I think I messed up the mat4 and transform operations
-// check and fix this
 
 Mat4 Mat4::operator* (const Mat4& other) const {
-    Mat4 result;
+    Mat4 result {};
     for (size_t i = 0; i < 4; i++) {
         for (size_t j = 0; j < 4; j++) {
-            result[i * 4 + j] = 0;
             for (size_t k = 0; k < 4; k++) {
                 result[i * 4 + j] += data[i * 4 + k] * other[k * 4 + j];
             }
@@ -97,9 +89,8 @@ Mat4 Mat4::operator* (const Mat4& other) const {
 }
 
 std::array<float, 4> Mat4::operator* (const std::array<float, 4>& v) const {
-    std::array<float, 4> result;
+    std::array<float, 4> result{};
     for (size_t i = 0; i < 4; i++) {
-        result[i] = 0;
         for (size_t j = 0; j < 4; j++) {
             result[i] += data[i * 4 + j] * v[j];
         }
@@ -108,15 +99,13 @@ std::array<float, 4> Mat4::operator* (const std::array<float, 4>& v) const {
 }
 
 Vec3 Mat4::operator* (const Vec3& v) const {
-    return Vec3(data[0] * v.x + data[1] * v.y + data[2] * v.z,
-                data[3] * v.x + data[4] * v.y + data[5] * v.z,
-                data[6] * v.x + data[7] * v.y + data[8] * v.z);
+    auto arr = operator*(v.to_homog());
+    return Vec3::from_homog(arr);
 }
 
 Pt3 Mat4::operator* (const Pt3& v) const {
-    return Pt3(data[0] * v.x + data[1] * v.y + data[2] * v.z + data[3],
-               data[4] * v.x + data[5] * v.y + data[6] * v.z + data[7],
-               data[8] * v.x + data[9] * v.y + data[10] * v.z + data[11]);
+    auto arr = operator*(v.to_homog());
+    return Pt3::from_homog(arr);
 }
 
 Mat4 Mat4::identity() {
@@ -136,20 +125,54 @@ Mat4 Mat4::diagonal(const std::array<float, 4>& v) {
     result[15] = v[3];
     return result;
 }
-Mat4 Mat4::rotation(const Vec3& axis, float angle) {
+
+Mat4 Mat4::rotate_x(float angle) {
     Mat4 result{};
-    result[0] = axis.x * axis.x + (1 - axis.x * axis.x) * std::cos(angle);
-    result[1] = axis.x * axis.y * (1 - std::cos(angle)) - axis.z * std::sin(angle);
-    result[2] = axis.x * axis.z * (1 - std::cos(angle)) + axis.y * std::sin(angle);
-    result[4] = axis.x * axis.y * (1 - std::cos(angle)) + axis.z * std::sin(angle);
-    result[5] = axis.y * axis.y + (1 - axis.y * axis.y) * std::cos(angle);
-    result[6] = axis.y * axis.z * (1 - std::cos(angle)) - axis.x * std::sin(angle);
-    result[8] = axis.x * axis.z * (1 - std::cos(angle)) - axis.y * std::sin(angle);
-    result[9] = axis.y * axis.z * (1 - std::cos(angle)) + axis.x * std::sin(angle);
-    result[10] = axis.z * axis.z + (1 - axis.z * axis.z) * std::cos(angle);
+    result[0] = 1;
+    result[5] = std::cos(angle);
+    result[6] = -std::sin(angle);
+    result[9] = std::sin(angle);
+    result[10] = std::cos(angle);
     result[15] = 1;
     return result;
 }
+
+Mat4 Mat4::rotate_y(float angle) {
+    Mat4 result{};
+    result[0] = std::cos(angle);
+    result[2] = std::sin(angle);
+    result[5] = 1;
+    result[8] = -std::sin(angle);
+    result[10] = std::cos(angle);
+    result[15] = 1;
+    return result;
+}
+
+Mat4 Mat4::rotate_z(float angle) {
+    Mat4 result{};
+    result[0] = std::cos(angle);
+    result[1] = -std::sin(angle);
+    result[4] = std::sin(angle);
+    result[5] = std::cos(angle);
+    result[10] = 1;
+    result[15] = 1;
+    return result;
+}
+
+Mat4 Mat4::rotation(const Vec3& axis, float angle) {
+    float ux = axis.x;
+    float uy = axis.y;
+    float uz = axis.z;
+    float cos_theta = std::cos(angle);
+    float sin_theta = std::sin(angle);
+    return Mat4({
+        cos_theta + ux * ux * (1 - cos_theta), ux * uy * (1 - cos_theta) - uz * sin_theta, ux * uz * (1 - cos_theta) + uy * sin_theta, 0,
+        uy * ux * (1 - cos_theta) + uz * sin_theta, cos_theta + uy * uy * (1 - cos_theta), uy * uz * (1 - cos_theta) - ux * sin_theta, 0,
+        uz * ux * (1 - cos_theta) - uy * sin_theta, uz * uy * (1 - cos_theta) + ux * sin_theta, cos_theta + uz * uz * (1 - cos_theta), 0,
+        0, 0, 0, 1
+    });
+}
+
 
 Vec3 Transform::apply(const Vec3& v) const {
     return m_mat * v;
@@ -164,14 +187,14 @@ Pt3 Transform::apply_inverse(const Pt3& v) const {
     return m_inv_mat * v;
 };
 
-Vec3 Transform::operator* (const Vec3& v) const {
-    return apply(v);
+Ray Transform::apply(const Ray& r) const {
+    return Ray(m_mat * r.o, m_mat * r.d);
 }
-Pt3 Transform::operator* (const Pt3& p) const {
-    return apply(p);
+Ray Transform::apply_inverse(const Ray& r) const {
+    return Ray(m_inv_mat * r.o, m_inv_mat * r.d);
 }
 
-Transform Transform::operator* (const Transform& t) const {
+Transform Transform::apply(const Transform& t) const {
     return Transform(m_mat * t.m_mat, t.m_inv_mat * m_inv_mat);
 }
 
@@ -180,21 +203,54 @@ Transform Transform::identity() {
 }
 
 Transform Transform::translation(const Vec3& v) {
+    return translation(v.x, v.y, v.z);
+}
+
+Transform Transform::translation(float x, float y, float z) {
     Mat4 mat = Mat4::identity();
-    mat[12] = v.x;
-    mat[13] = v.y;
-    mat[14] = v.z;
+    mat[3] = x;
+    mat[7] = y;
+    mat[11] = z;
     Mat4 inv_mat = Mat4::identity();
-    inv_mat[12] = -v.x;
-    inv_mat[13] = -v.y;
-    inv_mat[14] = -v.z;
+    inv_mat[3] = -x;
+    inv_mat[7] = -y;
+    inv_mat[11] = -z;
     return Transform(std::move(mat), std::move(inv_mat));
 }
 
 Transform Transform::scale(const Vec3& v) {
-    Mat4 mat = Mat4::diagonal({v.x, v.y, v.z, 1});
-    Mat4 inv_mat = Mat4::diagonal({1 / v.x, 1 / v.y, 1 / v.z, 1});
+    return scale(v.x, v.y, v.z);
+}
+
+Transform Transform::scale(float x, float y, float z) {
+    Mat4 mat = Mat4::diagonal({x, y, z, 1});
+    Mat4 inv_mat = Mat4::diagonal({1 / x, 1 / y, 1 / z, 1});
     return Transform(std::move(mat), std::move(inv_mat));
+}
+
+Transform Transform::scale(float c) {
+    return scale(c, c, c);
+}
+
+Transform Transform::rotate_x(float angle) {
+    return Transform(
+        Mat4::rotate_x(angle),
+        Mat4::rotate_x(-angle)
+    );
+}
+
+Transform Transform::rotate_y(float angle) {
+    return Transform(
+        Mat4::rotate_y(angle),
+        Mat4::rotate_y(-angle)
+    );
+}
+
+Transform Transform::rotate_z(float angle) {
+    return Transform(
+        Mat4::rotate_z(angle),
+        Mat4::rotate_z(-angle)
+    );
 }
 
 Transform Transform::rotation(const Vec3& axis, float angle) {

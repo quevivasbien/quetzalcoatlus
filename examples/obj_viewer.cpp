@@ -5,6 +5,7 @@
 int main(int argc, const char* const argv[]) {
     std::string filename;
     Vec3 camera_position(0., 2.0, 7);
+    Vec3 camera_rotation(0., 0., 0.);
     if (argc < 2) {
         std::cerr << "Usage: program_name file_name [camera_x camera_y camera_z] [rotate_x rotate_y rotate_z]" << std::endl;
         std::cerr << "No file provided, trying with file_name = teapot.obj" << std::endl;
@@ -17,6 +18,12 @@ int main(int argc, const char* const argv[]) {
         }
         else {
             std::cerr << "No camera position provided, using (0, 2, 7)" << std::endl;
+        }
+        if (argc >= 7) {
+            camera_rotation = Vec3(std::stof(argv[5]), std::stof(argv[6]), std::stof(argv[7]));
+        }
+        else {
+            std::cerr << "No camera rotation provided, using (0, 0, 0)" << std::endl;
         }
     }
 
@@ -37,9 +44,14 @@ int main(int argc, const char* const argv[]) {
     scene.add_obj(filename, &material);
     scene.commit();
 
+    Transform camera_t =
+        Transform::translation(camera_position)
+        * Transform::rotate_x(camera_rotation.x)
+        * Transform::rotate_y(camera_rotation.y)
+        * Transform::rotate_z(camera_rotation.z);
     Camera camera(
         1920, 1080, M_PI / 3.0,
-        Transform::translation(camera_position)
+        camera_t
     );
     size_t n_samples = 16;
     size_t max_bounces = 64;
