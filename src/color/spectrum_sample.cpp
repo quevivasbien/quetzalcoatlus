@@ -133,7 +133,7 @@ SpectrumSample SpectrumSample::operator/(const SpectrumSample& other) const {
     #endif
     SampleArray values;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
-        values[i] = m_values[i] / other.m_values[i];
+        values[i] = other.m_values[i] == 0.0f ? 0.0f : m_values[i] / other.m_values[i];
     }
     return SpectrumSample(std::move(values), m_wavelengths);
 }
@@ -142,7 +142,12 @@ SpectrumSample& SpectrumSample::operator/=(const SpectrumSample& other) {
     assert(m_wavelengths == other.m_wavelengths);
     #endif
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
-        m_values[i] /= other.m_values[i];
+        if (other.m_values[i] == 0.0f) {
+            m_values[i] = 0.0f;
+        }
+        else {
+            m_values[i] /= other.m_values[i];
+        }
     }
     return *this;
 }
@@ -195,14 +200,19 @@ SpectrumSample& SpectrumSample::operator*=(float c) {
 SpectrumSample SpectrumSample::operator/(float c) const {
     SampleArray values;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
-        values[i] = m_values[i] / c;
+        values[i] = c == 0.0f ? 0.0f : m_values[i] / c;
     }
     return SpectrumSample(std::move(values), m_wavelengths);
 }
 
 SpectrumSample& SpectrumSample::operator/=(float c) {
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
-        m_values[i] /= c;
+        if (c == 0.0f) {
+            m_values[i] = 0.0f;
+        }
+        else {
+            m_values[i] /= c;
+        }
     }
     return *this;
 }

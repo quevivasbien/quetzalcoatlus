@@ -9,6 +9,7 @@
 
 class RGB : public Vec3 {
 public:
+    RGB() : Vec3(0.0f, 0.0f, 0.0f) {}
     explicit RGB(Vec3&& v) : Vec3(std::move(v)) {}
     RGB(float r, float g, float b) : Vec3(r, g, b) {}
 };

@@ -52,7 +52,7 @@ public:
         Vec3 new_dir = onb.from_local(sampler.sample_cosine_hemisphere());
 
         return ScatterEvent(
-            Ray(isect.point, isect.dir),
+            Ray(isect.point, new_dir),
             texture.value(isect.uv, isect.point, isect.lambdas),
             sampler.cosine_hemisphere_pdf(onb.u[0].dot(new_dir))
         );

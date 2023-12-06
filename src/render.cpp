@@ -45,7 +45,7 @@ SpectrumSample sample_pixel_inner(
     if (bounces == 0) {
         return SpectrumSample(0.0f, wavelengths);
     }
-    auto isect = scene.ray_intersect(r, sampler);
+    auto isect = scene.ray_intersect(r, wavelengths, sampler);
     if (!isect) {
         return SpectrumSample(0.0f, wavelengths);
     }
@@ -66,7 +66,7 @@ PixelSample sample_pixel(
     size_t bounces
 ) {
     PixelSample pixel_sample(wavelengths);
-    auto isect = scene.ray_intersect(r, sampler);
+    auto isect = scene.ray_intersect(r, wavelengths, sampler);
     if (!isect) {
         return pixel_sample;
     }
@@ -85,19 +85,23 @@ PixelSample sample_pixel(
 }
 
 template <size_t N>
-std::array<Vec3, N> sample_pixel_inner(
+std::vector<SpectrumSample> sample_pixel_inner(
     const std::array<Ray, N>& rays,
     const std::array<int, N>& valid,
     const Scene& scene,
-    const WavelengthSample& wavelengths,
+    const std::vector<WavelengthSample>& wavelengths,
     Sampler& sampler,
     size_t bounces
 ) {
-    std::array<Vec3, N> samples;
+    std::vector<SpectrumSample> samples;
+    samples.reserve(N);
+    for (size_t i = 0; i < N; i++) {
+        samples.push_back(SpectrumSample(0.0f, wavelengths[i]));
+    }
     if (bounces == 0) {
         return samples;
     }
-    auto isects = scene.ray_intersect(rays, sampler, valid);
+    auto isects = scene.ray_intersect(rays, wavelengths, sampler, valid);
     std::array<Ray, N> new_rays;
     std::array<int, N> new_valid{};
     for (size_t i = 0; i < N; i++) {
@@ -140,28 +144,32 @@ std::array<Vec3, N> sample_pixel_inner(
 }
 
 template <size_t N>
-std::array<PixelSample, N> sample_pixel(
+std::vector<PixelSample> sample_pixel(
     const std::array<Ray, N>& rays,
     const Scene& scene,
-    const WavelengthSample& wavelengths,
+    const std::vector<WavelengthSample>& wavelengths,
     Sampler& sampler,
     size_t bounces
 ) {
-    std::array<PixelSample, N> pixel_samples;
+    std::vector<PixelSample> samples;
+    samples.reserve(N);
+    for (size_t i = 0; i < N; i++) {
+        samples.push_back(PixelSample(wavelengths[i]));
+    }
     // valid = -1 means we want to continue tracing this ray
     // valid = 0 means we want to stop tracing this ray
     // this is just based on embree syntax for rtcIntersect4/8/16
     std::array<Ray, N> new_rays;
     std::array<int, N> valid{};
-    auto isects = scene.ray_intersect(rays, sampler);
+    auto isects = scene.ray_intersect(rays, wavelengths, sampler);
     for (size_t i = 0; i < N; i++) {
         if (!isects[i]) {
             continue;
         }
-        pixel_samples[i].normal = isects[i]->normal;
-        pixel_samples[i].albedo = isects[i]->color;
+        samples[i].normal = isects[i]->normal;
+        samples[i].albedo = isects[i]->color;
         if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
-            pixel_samples[i].color = isects[i]->color;
+            samples[i].color = isects[i]->color;
             continue;
         }
         new_rays[i] = *isects[i]->new_ray;
@@ -175,7 +183,7 @@ std::array<PixelSample, N> sample_pixel(
         }
     }
     if (exit) {
-        return pixel_samples;
+        return samples;
     }
     
     auto inner_samples = sample_pixel_inner(
@@ -186,12 +194,12 @@ std::array<PixelSample, N> sample_pixel(
         bounces-1
     );
     for (size_t i = 0; i < N; i++) {
-        pixel_samples[i].color = (
+        samples[i].color = (
             isects[i]->color * isects[i]->pdf * inner_samples[i]
         ) / isects[i]->pdf;
     }
 
-    return pixel_samples;
+    return samples;
 }
 
 void render_pixels(
@@ -214,24 +222,30 @@ void render_pixels(
         size_t x = i % camera.image_width;
         size_t y = camera.image_height - i / camera.image_width - 1;
 
-        Vec3 color{};
+        RGB color{};
         Vec3 normal{};
-        Vec3 albedo{};
+        RGB albedo{};
         #ifdef PACKET_SIZE
         size_t n_chunks = n_samples / PACKET_SIZE;
         size_t rem  = n_samples % PACKET_SIZE;
         for (size_t chunk = 0; chunk < n_chunks; chunk++) {
             std::array<Ray, PACKET_SIZE> rays;
+            std::vector<WavelengthSample> wavelengths;
+            wavelengths.reserve(PACKET_SIZE);
             for (size_t ss = 0; ss < PACKET_SIZE; ss++) {
                 sampler.set_sample_index(chunk * PACKET_SIZE + ss);
                 auto jitter = sampler.sample_2d();
                 float u = float(x) + jitter.x;
                 float v = float(y) + jitter.y;
-                rays[ss] = camera.cast_ray(u, v); 
+                rays[ss] = camera.cast_ray(u, v);
+                float w = sampler.sample_1d();
+                wavelengths.push_back(WavelengthSample::uniform(w));
             }
-            std::array<PixelSample, PACKET_SIZE> samples = sample_pixel(rays, scene, sampler, max_bounces);
+            auto samples = sample_pixel(rays, scene, wavelengths, sampler, max_bounces);
             for (size_t s = 0; s < PACKET_SIZE; s++) {
-                pixel += samples[s];
+                color += PixelSensor::CIE_XYZ().to_sensor_rgb(samples[s].color);
+                albedo = PixelSensor::CIE_XYZ().to_sensor_rgb(samples[s].albedo);
+                normal += samples[s].normal;
             }
         }
         for (size_t s = 0; s < rem; s++) {
@@ -240,7 +254,11 @@ void render_pixels(
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
-            pixel += sample_pixel(r, scene, sampler, max_bounces);
+            WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
+            auto sample = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
+            color += PixelSensor::CIE_XYZ().to_sensor_rgb(sample.color);
+            albedo += PixelSensor::CIE_XYZ().to_sensor_rgb(sample.albedo);
+            normal += sample.normal;
         }
         #else
         for (size_t s = 0; s < n_samples; s++) {
@@ -249,22 +267,28 @@ void render_pixels(
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
-            pixel += sample_pixel(r, scene, sampler, max_bounces);
+            WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
+            auto sample = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
+            color += PixelSensor::CIE_XYZ().to_sensor_rgb(sample.color);
+            albedo += PixelSensor::CIE_XYZ().to_sensor_rgb(sample.albedo);
+            normal += sample.normal;
         }
         #endif
-        pixel /= float(n_samples);
+        color /= float(n_samples);
+        albedo /= float(n_samples);
+        normal /= float(n_samples);
 
-        result.color_buffer[i * 3 + 0] = pixel.color.x;
-        result.color_buffer[i * 3 + 1] = pixel.color.y;
-        result.color_buffer[i * 3 + 2] = pixel.color.z;
+        result.color_buffer[i * 3 + 0] = color.x;
+        result.color_buffer[i * 3 + 1] = color.y;
+        result.color_buffer[i * 3 + 2] = color.z;
 
-        result.normal_buffer[i * 3 + 0] = pixel.normal.x;
-        result.normal_buffer[i * 3 + 1] = pixel.normal.y;
-        result.normal_buffer[i * 3 + 2] = pixel.normal.z;
+        result.normal_buffer[i * 3 + 0] = normal.x;
+        result.normal_buffer[i * 3 + 1] = normal.y;
+        result.normal_buffer[i * 3 + 2] = normal.z;
 
-        result.albedo_buffer[i * 3 + 0] = pixel.albedo.x;
-        result.albedo_buffer[i * 3 + 1] = pixel.albedo.y;
-        result.albedo_buffer[i * 3 + 2] = pixel.albedo.z;
+        result.albedo_buffer[i * 3 + 0] = albedo.x;
+        result.albedo_buffer[i * 3 + 1] = albedo.y;
+        result.albedo_buffer[i * 3 + 2] = albedo.z;
     }
 
     {

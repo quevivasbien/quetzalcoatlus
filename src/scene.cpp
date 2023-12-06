@@ -39,7 +39,11 @@ Vec2 get_sphere_uv(const Vec3& n) {
     return Vec2(u, v);
 }
 
-std::optional<SceneIntersection> Scene::ray_intersect(const Ray& ray, Sampler& sampler) const {
+std::optional<SceneIntersection> Scene::ray_intersect(
+    const Ray& ray,
+    const WavelengthSample& wavelengths,
+    Sampler& sampler
+) const {
     alignas(16) RTCRayHit rayhit;
     rayhit.ray.org_x = ray.o.x;
     rayhit.ray.org_y = ray.o.y;
@@ -77,7 +81,8 @@ std::optional<SceneIntersection> Scene::ray_intersect(const Ray& ray, Sampler& s
         uv,
         normal,
         ray.at(rayhit.ray.tfar),
-        ray.d.dot(normal) < 0.0f
+        ray.d.dot(normal) < 0.0f,
+        wavelengths
     );
     const Material* material = (*geom_data)->material;
 
@@ -114,6 +119,7 @@ std::array<std::optional<SceneIntersection>, N> rayhit_result(
     const RHN& rayhits,
     const std::array<Ray, N>& rays,
     const std::array<int, N>& valid,
+    const std::vector<WavelengthSample>& wavelengths,
     Sampler& sampler
 ) {
     std::array<std::optional<SceneIntersection>, N> result;
@@ -139,7 +145,8 @@ std::array<std::optional<SceneIntersection>, N> rayhit_result(
             uv,
             normal,
             rays[i].at(rayhits.ray.tfar[i]),
-            rays[i].d.dot(normal) < 0.0f
+            rays[i].d.dot(normal) < 0.0f,
+            wavelengths[i]
         );
         const Material* material = (*geom_data)->material;
         result[i] = SceneIntersection(
@@ -153,24 +160,26 @@ std::array<std::optional<SceneIntersection>, N> rayhit_result(
 
 std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
     const std::array<Ray, 4>& rays,
+    const std::vector<WavelengthSample>& wavelengths,
     Sampler& sampler,
     const std::array<int, 4>& valid
 ) const {
     alignas(16) RTCRayHit4 rayhits;
     build_rayhits(rayhits, rays, valid);
     rtcIntersect4(valid.data(), m_scene, &rayhits);
-    return rayhit_result(this, rayhits, rays, valid, sampler);
+    return rayhit_result(this, rayhits, rays, valid, wavelengths, sampler);
 }
 
 std::array<std::optional<SceneIntersection>, 8> Scene::ray_intersect(
     const std::array<Ray, 8>& rays,
+    const std::vector<WavelengthSample>& wavelengths,
     Sampler& sampler,
     const std::array<int, 8>& valid
 ) const {
     alignas(32) RTCRayHit8 rayhits;
     build_rayhits(rayhits, rays, valid);
     rtcIntersect8(valid.data(), m_scene, &rayhits);
-    return rayhit_result(this, rayhits, rays, valid, sampler);
+    return rayhit_result(this, rayhits, rays, valid, wavelengths, sampler);
 }
 
 unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material) {
