@@ -1,4 +1,4 @@
-#include <stdexcept>
+#include <cassert>
 
 #include "spectrum_sample.hpp"
 
@@ -66,9 +66,7 @@ bool SpectrumSample::is_zero() const {
 
 SpectrumSample SpectrumSample::operator+(const SpectrumSample& other) const {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
-    if (m_wavelengths != other.m_wavelengths) {
-        throw std::runtime_error("wavelength mismatch");
-    }
+    assert(m_wavelengths == other.m_wavelengths);
     #endif
     SampleArray values;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
@@ -78,9 +76,7 @@ SpectrumSample SpectrumSample::operator+(const SpectrumSample& other) const {
 }
 SpectrumSample& SpectrumSample::operator+=(const SpectrumSample& other) {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
-    if (m_wavelengths != other.m_wavelengths) {
-        throw std::runtime_error("wavelength mismatch");
-    }
+    assert(m_wavelengths == other.m_wavelengths);
     #endif
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
         m_values[i] += other.m_values[i];
@@ -89,9 +85,7 @@ SpectrumSample& SpectrumSample::operator+=(const SpectrumSample& other) {
 }
 SpectrumSample SpectrumSample::operator-(const SpectrumSample& other) const {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
-    if (m_wavelengths != other.m_wavelengths) {
-        throw std::runtime_error("wavelength mismatch");
-    }
+    assert(m_wavelengths == other.m_wavelengths);
     #endif
     SampleArray values;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
@@ -101,9 +95,7 @@ SpectrumSample SpectrumSample::operator-(const SpectrumSample& other) const {
 }
 SpectrumSample& SpectrumSample::operator-=(const SpectrumSample& other) {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
-    if (m_wavelengths != other.m_wavelengths) {
-        throw std::runtime_error("wavelength mismatch");
-    }
+    assert(m_wavelengths == other.m_wavelengths);
     #endif
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
         m_values[i] -= other.m_values[i];
@@ -112,9 +104,7 @@ SpectrumSample& SpectrumSample::operator-=(const SpectrumSample& other) {
 }
 SpectrumSample SpectrumSample::operator*(const SpectrumSample& other) {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
-    if (m_wavelengths != other.m_wavelengths) {
-        throw std::runtime_error("wavelength mismatch");
-    }
+    assert(m_wavelengths == other.m_wavelengths);
     #endif
     SampleArray values;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
@@ -124,9 +114,7 @@ SpectrumSample SpectrumSample::operator*(const SpectrumSample& other) {
 }
 SpectrumSample& SpectrumSample::operator*=(const SpectrumSample& other) {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
-    if (m_wavelengths != other.m_wavelengths) {
-        throw std::runtime_error("wavelength mismatch");
-    }
+    assert(m_wavelengths == other.m_wavelengths);
     #endif
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
         m_values[i] *= other.m_values[i];
@@ -135,9 +123,7 @@ SpectrumSample& SpectrumSample::operator*=(const SpectrumSample& other) {
 }
 SpectrumSample SpectrumSample::operator/(const SpectrumSample& other) const {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
-    if (m_wavelengths != other.m_wavelengths) {
-        throw std::runtime_error("wavelength mismatch");
-    }
+    assert(m_wavelengths == other.m_wavelengths);
     #endif
     SampleArray values;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
@@ -147,9 +133,7 @@ SpectrumSample SpectrumSample::operator/(const SpectrumSample& other) const {
 }
 SpectrumSample& SpectrumSample::operator/=(const SpectrumSample& other) {
     #ifdef CHECK_SPECTRUM_WAVELENGTHS
-    if (m_wavelengths != other.m_wavelengths) {
-        throw std::runtime_error("wavelength mismatch");
-    }
+    assert(m_wavelengths == other.m_wavelengths);
     #endif
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
         m_values[i] /= other.m_values[i];

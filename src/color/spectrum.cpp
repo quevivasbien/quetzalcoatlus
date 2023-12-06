@@ -83,7 +83,7 @@ PiecewiseLinearSpectrum PiecewiseLinearSpectrum::from_interleaved(
     PiecewiseLinearSpectrum spec(std::move(lambdas), std::move(values));
     if (normalize) {
         float c = spec.inner_product(*spectra::Y());
-        std::transform(spec.m_values.begin(), spec.m_values.end(), spec.m_values.begin(), [c](float v) { return v / c; });
+        std::transform(spec.m_values.begin(), spec.m_values.end(), spec.m_values.begin(), [c](float v) { return v * spectra::CIE_Y_INTEGRAL / c; });
     }
     
     return spec;
@@ -483,7 +483,8 @@ namespace spectra {
         static std::shared_ptr<PiecewiseLinearSpectrum> std_illum_d65;
         if (std_illum_d65 == nullptr) {
             auto spec = PiecewiseLinearSpectrum::from_interleaved(
-                std::vector<float>(STD_ILLUM_D65_VALUES, STD_ILLUM_D65_VALUES + N_STD_ILLUM_D65_VALUES)
+                std::vector<float>(STD_ILLUM_D65_VALUES, STD_ILLUM_D65_VALUES + N_STD_ILLUM_D65_VALUES),
+                true
             );
             std_illum_d65 = std::make_shared<PiecewiseLinearSpectrum>(spec);
         }

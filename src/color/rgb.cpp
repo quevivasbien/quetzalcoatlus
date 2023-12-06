@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <iostream>
 
@@ -22,11 +23,15 @@ RGBColorSpace::RGBColorSpace(
         R.y, G.y, B.y,
         R.z, G.z, B.z
     });
-    XYZ C = XYZ(rgb.invert().value() * white);
+    auto rgb_inv = rgb.invert();
+    assert(rgb_inv.has_value());
+    XYZ C = XYZ(rgb_inv.value() * white);
     m_xyz_from_rgb = rgb * Mat3::diagonal({
         C.x, C.y, C.z
     });
-    m_rgb_from_xyz = m_xyz_from_rgb.invert().value();
+    auto xyz_from_rgb_inv = m_xyz_from_rgb.invert();
+    assert(xyz_from_rgb_inv.has_value());
+    m_rgb_from_xyz = xyz_from_rgb_inv.value();
 }
 
 RGB RGBColorSpace::rgb_from_xyz(const XYZ& xyz) const {
@@ -81,35 +86,15 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB& rgb) const {
         );
     }
 
-    float x, y, z;
-    size_t maxc;
     // set z as largest component, and the others as ratios over z
-    if (rgb.r() > rgb.g()) {
-        if (rgb.r() > rgb.b()) {
-            z = rgb.r();
-            x = rgb.g() / z;
-            y = rgb.b() / z;
-            maxc = 0;
-        } else {
-            z = rgb.b();
-            x = rgb.g() / z;
-            y = rgb.r() / z;
-            maxc = 2;
-        }
-    }
-    else {
-        if (rgb.g() > rgb.b()) {
-            z = rgb.g();
-            x = rgb.r() * (SPECTRUM_TABLE_RES - 1) / z;
-            y = rgb.b() * (SPECTRUM_TABLE_RES - 1) / z;
-            maxc = 1;
-        } else {
-            z = rgb.b();
-            x = rgb.r() * (SPECTRUM_TABLE_RES - 1) / z;
-            y = rgb.g() * (SPECTRUM_TABLE_RES - 1) / z;
-            maxc = 2;
-        }
-    }
+    std::array<float, 3> comps = {rgb.r(), rgb.g(), rgb.b()};
+    size_t maxc = (comps[0] > comps[1]) ? ((comps[0] > comps[2]) ? 0 : 2) :
+                               ((comps[1] > comps[2]) ? 1 : 2);
+    float z = comps[maxc];
+    float x = comps[(maxc + 1) % 3] * (SPECTRUM_TABLE_RES - 1) / z;
+    float y = comps[(maxc + 2) % 3] * (SPECTRUM_TABLE_RES - 1) / z;
+
+    // interpolate trilinearly over coefficients
     size_t xi = std::min(size_t(x), SPECTRUM_TABLE_RES - 2);
     size_t yi = std::min(size_t(y), SPECTRUM_TABLE_RES - 2);
     const auto pp =  std::lower_bound(

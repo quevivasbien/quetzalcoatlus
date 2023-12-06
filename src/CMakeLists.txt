@@ -6,6 +6,7 @@ target_sources(lib
         render.cpp
         scene.cpp
         texture.cpp
+        transform.cpp
         vec.cpp
 )
 
