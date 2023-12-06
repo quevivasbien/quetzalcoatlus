@@ -1,9 +1,13 @@
-add_library(color
+add_library(color STATIC
     rgb.cpp
     spectrum.cpp
+    spectrum_sample.cpp
     xyz.cpp
 )
 
-target_include_directories(color
-    PUBLIC ${CMAKE_SOURCE_DIR}/src
-)
+target_link_libraries(color PRIVATE lib)
+
+add_executable(color_test
+    color_test.cpp)
+
+target_link_libraries(color_test PRIVATE color lib)

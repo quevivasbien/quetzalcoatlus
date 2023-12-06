@@ -6,188 +6,83 @@
 
 #include "spectrum.hpp"
 
-#define CHECK_SPECTRUM_WAVELENGTHS
+const size_t N_SPECTRUM_SAMPLES = 4;
 
-template <size_t N>
 class WavelengthSample {
 public:
+    using SampleArray = std::array<float, N_SPECTRUM_SAMPLES>;
+
     WavelengthSample(
-        std::array<float, N>&& lambdas,
-        std::array<float, N>&& pdf
-    ) : m_lambdas(std::move(lambdas)), m_pdf(std::move(pdf)) {}
-    static WavelengthSample uniform(float u, float lambda_min = LAMBDA_MIN, float lambda_max = LAMBDA_MAX) {
-        std::array<float, N> lambdas;
-        lambdas[0] = (1.0f - u) * lambda_min + u * lambda_max;
-        float delta = (lambda_max - lambda_min) / N;
-        for (size_t i = 1; i < N; i++) {
-            lambdas[i] = lambdas[i - 1] + delta;
-            if (lambdas[i] > lambda_max) {
-                lambdas[i] = lambda_min + (lambdas[i] - lambda_max);
-            }
-        }
-        std::array<float, N> pdf;
-        pdf.fill(1.0f / (lambda_max - lambda_min));
-        return WavelengthSample(std::move(lambdas), std::move(pdf));
-    }
+        SampleArray&& lambdas,
+        SampleArray&& pdf
+    );
 
-    bool secondary_terminated() const {
-        for (size_t i = 1; i < N; i++) {
-            if (m_pdf[i] != 0.0f) {
-                return false;
-            }
-        }
-        return true;
-    }
+    static WavelengthSample uniform(float u, float lambda_min = LAMBDA_MIN, float lambda_max = LAMBDA_MAX);
 
-    void terminate_secondary() {
-        if (secondary_terminated()) {
-            return;
-        }
-        for (size_t i = 1; i < N; i++) {
-            m_pdf[i] = 0.0f;
-        }
-        m_pdf[0] /= N;
-    }
+    bool secondary_terminated() const;
 
-    std::array<float, N> m_lambdas;
-    std::array<float, N> m_pdf;
+    void terminate_secondary();
+
+    SampleArray m_lambdas;
+    SampleArray m_pdf;
 };
 
-template <size_t N>
+
 class SpectrumSample {
 public:
+    using SampleArray = std::array<float, N_SPECTRUM_SAMPLES>;
+
     SpectrumSample(
-        std::array<float, N>&& values,
-        const std::shared_ptr<const WavelengthSample<N>>& wavelengths
+        SampleArray&& values,
+        const std::shared_ptr<const WavelengthSample>& wavelengths
     ) : m_values(std::move(values)), m_wavelengths(wavelengths) {}
     
     SpectrumSample(
-        float c, const std::shared_ptr<const WavelengthSample<N>>& wavelengths
+        float c, const std::shared_ptr<const WavelengthSample>& wavelengths
     ) : m_wavelengths(wavelengths) {
         m_values.fill(c);
     }
 
+    static SpectrumSample from_spectrum(const Spectrum& spectrum, std::shared_ptr<const WavelengthSample> wavelengths);
+
     float operator[](size_t i) const { return m_values[i]; }
     float& operator[](size_t i) { return m_values[i]; }
 
-    bool is_zero() const {
-        for (size_t i = 0; i < N; ++i) {
-            if (m_values[i] != 0.0f) {
-                return false;
-            }
-        }
-        return true;
-    }
+    bool is_zero() const;
 
     // arithmetic operators
-    SpectrumSample<N> operator+(const SpectrumSample<N>& other) const {
-        #ifdef CHECK_SPECTRUM_WAVELENGTHS
-        if (m_wavelengths != other.m_wavelengths) {
-            throw std::runtime_error("wavelength mismatch");
-        }
-        #endif
-        std::array<float, N> values;
-        for (size_t i = 0; i < N; ++i) {
-            values[i] = m_values[i] + other.m_values[i];
-        }
-        return SpectrumSample<N>(values, m_wavelengths);
-    }
-    SpectrumSample<N>& operator+=(const SpectrumSample<N>& other) {
-        #ifdef CHECK_SPECTRUM_WAVELENGTHS
-        if (m_wavelengths != other.m_wavelengths) {
-            throw std::runtime_error("wavelength mismatch");
-        }
-        #endif
-        for (size_t i = 0; i < N; ++i) {
-            m_values[i] += other.m_values[i];
-        }
-        return *this;
-    }
-    SpectrumSample<N> operator-(const SpectrumSample<N>& other) const {
-        #ifdef CHECK_SPECTRUM_WAVELENGTHS
-        if (m_wavelengths != other.m_wavelengths) {
-            throw std::runtime_error("wavelength mismatch");
-        }
-        #endif
-        std::array<float, N> values;
-        for (size_t i = 0; i < N; ++i) {
-            values[i] = m_values[i] - other.m_values[i];
-        }
-        return SpectrumSample<N>(values, m_wavelengths);
-    }
-    SpectrumSample<N>& operator-=(const SpectrumSample<N>& other) {
-        #ifdef CHECK_SPECTRUM_WAVELENGTHS
-        if (m_wavelengths != other.m_wavelengths) {
-            throw std::runtime_error("wavelength mismatch");
-        }
-        #endif
-        for (size_t i = 0; i < N; ++i) {
-            m_values[i] -= other.m_values[i];
-        }
-        return *this;
-    }
-    SpectrumSample<N> operator*(float c) const {
-        std::array<float, N> values;
-        for (size_t i = 0; i < N; ++i) {
-            values[i] = m_values[i] * c;
-        }
-        return SpectrumSample<N>(values, m_wavelengths);
-    }
-    SpectrumSample<N>& operator*=(float c) {
-        for (size_t i = 0; i < N; ++i) {
-            m_values[i] *= c;
-        }
-        return *this;
-    }
-    SpectrumSample<N> operator/(float c) const {
-        std::array<float, N> values;
-        for (size_t i = 0; i < N; ++i) {
-            values[i] = m_values[i] / c;
-        }
-        return SpectrumSample<N>(values, m_wavelengths);
-    }
-    SpectrumSample<N>& operator/=(float c) {
-        for (size_t i = 0; i < N; ++i) {
-            m_values[i] /= c;
-        }
-        return *this;
-    }
+    SpectrumSample operator+(const SpectrumSample& other) const;
+    SpectrumSample& operator+=(const SpectrumSample& other);
+    SpectrumSample operator-(const SpectrumSample& other) const;
+    SpectrumSample& operator-=(const SpectrumSample& other);
+    SpectrumSample operator*(const SpectrumSample& other);
+    SpectrumSample& operator*=(const SpectrumSample& other);
+    SpectrumSample operator/(const SpectrumSample& other) const;
+    SpectrumSample& operator/=(const SpectrumSample& other);
 
-    float average() const {
-        float sum = 0.0f;
-        for (size_t i = 0; i < N; ++i) {
-            sum += m_values[i];
-        }
-        return sum / N;
-    }
+    float average() const;
 
     // pointwise map
     template <typename F>
-    SpectrumSample<N> map(F&& f) const {
-        std::array<float, N> values;
-        for (size_t i = 0; i < N; ++i) {
+    SpectrumSample map(F&& f) const {
+        SampleArray values;
+        for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
             values[i] = f(m_values[i]);
         }
-        return SpectrumSample<N>(values, m_lambdas);
+        return SpectrumSample(values, m_wavelengths);
     }
 
     template <typename F>
     void map_inplace(F&& f) {
-        for (size_t i = 0; i < N; ++i) {
+        for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
             m_values[i] = f(m_values[i]);
         }
     }
 
     // construct new spectrum from wavelengths pdf
-    SpectrumSample<N> new_from_pdf() {
-        return SpectrumSample<N>(
-            m_wavelengths->m_pdf,
-            m_wavelengths
-        );
-    }
+    SpectrumSample new_from_pdf() const;
 
-private:
-    std::array<float, N> m_values;
+    SampleArray m_values;
     std::shared_ptr<const WavelengthSample> m_wavelengths;
 };
 

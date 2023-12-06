@@ -11,15 +11,7 @@ find_package(OpenImageDenoise 2.1 REQUIRED)
 # must set embree_DIR to /path/to/embree/lib/cmake/embree-{version}
 find_package(embree 4.3 REQUIRED)
 
-add_library(lib
-    src/camera.cpp
-    src/image.cpp
-    src/random.cpp
-    src/render.cpp
-    src/scene.cpp
-    src/texture.cpp
-    src/vec.cpp
-)
+add_library(lib STATIC "")
 target_link_libraries(lib
     ${OpenCV_LIBS}
     OpenImageDenoise
@@ -27,4 +19,4 @@ target_link_libraries(lib
 )
 
 add_subdirectory(examples)
-add_subdirectory(src/color)
+add_subdirectory(src)
