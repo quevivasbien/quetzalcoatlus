@@ -2,8 +2,10 @@
 #include <cmath>
 #include <iostream>
 
-#include "sRGB_spectrum_table.hpp"
+#include "rgb_to_spectrum_opt.hpp"
 #include "rgb.hpp"
+
+const size_t SPECTRUM_TABLE_RES = 24;
 
 RGBColorSpace::RGBColorSpace(
     Vec2 r, Vec2 g, Vec2 b,
@@ -98,13 +100,13 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB& rgb) const {
     else {
         if (rgb.g() > rgb.b()) {
             z = rgb.g();
-            x = rgb.r() / z;
-            y = rgb.b() / z;
+            x = rgb.r() * (SPECTRUM_TABLE_RES - 1) / z;
+            y = rgb.b() * (SPECTRUM_TABLE_RES - 1) / z;
             maxc = 1;
         } else {
             z = rgb.b();
-            x = rgb.r() / z;
-            y = rgb.g() / z;
+            x = rgb.r() * (SPECTRUM_TABLE_RES - 1) / z;
+            y = rgb.g() * (SPECTRUM_TABLE_RES - 1) / z;
             maxc = 2;
         }
     }
@@ -116,17 +118,26 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB& rgb) const {
         z
     );
     size_t zi = std::distance(m_z_nodes.begin(), pp);
-    std::array<float, 3> coeffs;
+    if (zi != 0) {
+        zi--;
+    }
     if (zi > SPECTRUM_TABLE_RES - 2) {
         std::cout << "zi out of range, clamping to max" << std::endl;
         zi = SPECTRUM_TABLE_RES - 2;
     }
+    std::array<float, 3> coeffs;
     float dx = x - xi;
     float dy = y - yi;
     float dz = (z - m_z_nodes[zi]) / (m_z_nodes[zi + 1] - m_z_nodes[zi]);
     for (size_t i = 0; i < 3; i++) {
-        auto co = [&](size_t dx, size_t dy, size_t dz) {
-            return m_coeffs[maxc][zi + dz][yi + dy][xi + dx][i];
+        auto co = [&](size_t dxi, size_t dyi, size_t dzi) {
+            // todo: represent the array more efficiently
+            size_t index = maxc * SPECTRUM_TABLE_RES * SPECTRUM_TABLE_RES * SPECTRUM_TABLE_RES * 3
+                + (zi + dzi) * SPECTRUM_TABLE_RES * SPECTRUM_TABLE_RES * 3
+                + (yi + dyi) * SPECTRUM_TABLE_RES * 3
+                + (xi + dxi) * 3
+                + i;
+            return m_coeffs[index];
         };
         coeffs[i] = lerp(
             lerp(
@@ -143,17 +154,15 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB& rgb) const {
         );
     }
 
-    return RGBSigmoidPolynomial(coeffs[0], coeffs[1], coeffs[2]);
+    return RGBSigmoidPolynomial(coeffs[2], coeffs[1], coeffs[0]);
 }
 
 std::shared_ptr<const RGBToSpectrumTable> RGBToSpectrumTable::sRGB() {
     static std::shared_ptr<const RGBToSpectrumTable> table;
     if (!table) {
+        auto [scale, coeffs] = opt_rgb::optimize_coeffs(opt_rgb::Gamut::SRGB, SPECTRUM_TABLE_RES);
         table = std::make_shared<RGBToSpectrumTable>(
-            std::array<float, SPECTRUM_TABLE_RES>({
-                0, 1.67704457e-06, 2.62230806e-05, 0.000129584747, 0.000399308716, 0.000949404493, 0.00191508455, 0.00344748166, 0.00570843136, 0.00886540301, 0.013086644, 0.0185365994, 0.0253716707, 0.0337363295, 0.0437596664, 0.0555523485, 0.0692040548, 0.0847813785, 0.102326222, 0.121854618, 0.143356144, 0.166793674, 0.192103669, 0.219196871, 0.247959405, 0.2782543, 0.309923291, 0.342789054, 0.376657575, 0.411320895, 0.446559966, 0.482147723, 0.517852247, 0.553440034, 0.588679135, 0.623342395, 0.657210946, 0.690076709, 0.721745729, 0.752040565, 0.780803144, 0.807896316, 0.833206296, 0.856643856, 0.878145397, 0.897673786, 0.915218592, 0.930795968, 0.944447637, 0.956240356, 0.966263652, 0.974628329, 0.981463373, 0.986913383, 0.991134584, 0.994291544, 0.996552527, 0.998084903, 0.999050617, 0.999600708, 0.99987042, 0.999973774, 0.999998331, 1,
-            }),
-            sRGBToSpectrumTable_Data
+            std::move(scale), std::move(coeffs)
         );
     }
     return table;
@@ -164,7 +173,7 @@ std::shared_ptr<const RGBColorSpace> RGBColorSpace::sRGB() {
     if (!space) {
         space = std::make_shared<RGBColorSpace>(
             Vec2(0.64, 0.33),
-            Vec2(.3, 0.6),
+            Vec2(0.3, 0.6),
             Vec2(0.15, 0.06),
             spectra::STD_ILLUM_D65(),
             RGBToSpectrumTable::sRGB()

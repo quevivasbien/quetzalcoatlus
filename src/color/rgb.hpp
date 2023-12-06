@@ -26,21 +26,17 @@ public:
     float c0, c1, c2;
 };
 
-const size_t SPECTRUM_TABLE_RES = 64;
-
 class RGBToSpectrumTable {
 public:
-    using CoeffArray = float[3][SPECTRUM_TABLE_RES][SPECTRUM_TABLE_RES][SPECTRUM_TABLE_RES][3];
-
     static std::shared_ptr<const RGBToSpectrumTable> sRGB();
 
-    RGBToSpectrumTable(const std::array<float, SPECTRUM_TABLE_RES>& z_nodes, const CoeffArray& coeffs) : m_z_nodes(z_nodes), m_coeffs(coeffs) {}
+    RGBToSpectrumTable(std::vector<float>&& z_nodes, std::vector<float>&& coeffs) : m_z_nodes(std::move(z_nodes)), m_coeffs(std::move(coeffs)) {}
 
     // convert RGB to a polynomial representing a continuous spectrum
     RGBSigmoidPolynomial operator()(const RGB& rgb) const;
 
-    const std::array<float, SPECTRUM_TABLE_RES>& m_z_nodes;
-    const CoeffArray& m_coeffs;
+    std::vector<float> m_z_nodes;
+    std::vector<float> m_coeffs;
 };
 
 class RGBColorSpace {

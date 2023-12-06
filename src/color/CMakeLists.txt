@@ -1,5 +1,6 @@
 add_library(color STATIC
     rgb.cpp
+    rgb_to_spectrum_opt.cpp
     spectrum.cpp
     spectrum_sample.cpp
     xyz.cpp
