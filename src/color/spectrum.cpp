@@ -36,7 +36,7 @@ DenselySampledSpectrum::DenselySampledSpectrum(
 }
 
 float DenselySampledSpectrum::operator()(float lambda) const {
-    long index = std::lroundf(lambda);
+    long index = std::lroundf(lambda - m_lambda_min);
     if (index < 0 || index >= m_values.size()) {
         return 0.0f;
     }

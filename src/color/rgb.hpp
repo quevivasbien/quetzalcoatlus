@@ -15,11 +15,11 @@ public:
 
 
 // a polynomial that represents a spectrum of wavelengths
-class RGBSigmoidPolynomial {
+class RGBSigmoidPolynomial : public Spectrum {
 public:
     RGBSigmoidPolynomial(float c0, float c1, float c2) : c0(c0), c1(c1), c2(c2) {}
 
-    float operator()(float lambda) const;
+    float operator()(float lambda) const override;
 
     float max_value() const;
 
@@ -47,10 +47,10 @@ public:
         std::shared_ptr<const RGBToSpectrumTable> table
     );
 
-    RGB from_xyz(const XYZ& xyz) const;
-    XYZ to_xyz(const RGB& rgb) const;
+    RGB rgb_from_xyz(const XYZ& xyz) const;
+    XYZ rgb_to_xyz(const RGB& rgb) const;
 
-    RGB from_sample(const SpectrumSample& ss) const;
+    RGB rgb_from_sample(const SpectrumSample& ss) const;
 
     RGBSigmoidPolynomial to_spectrum(const RGB& rgb) const;
 

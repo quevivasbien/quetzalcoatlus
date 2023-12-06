@@ -19,6 +19,7 @@
 #include <condition_variable>
 #include <cstring>
 #include <functional>
+#include <fstream>
 #include <iostream>
 #include <mutex>
 #include <stdexcept>
@@ -855,6 +856,44 @@ std::pair<std::vector<float>, std::vector<float>> optimize_coeffs(Gamut gamut, s
     threadPool.reset();
 
     return {scale, out};
+}
+
+std::string to_string(Gamut gamut) {
+    switch (gamut) {
+        case Gamut::SRGB: return "SRGB";
+        case Gamut::ProPhotoRGB: return "ProPhotoRGB";
+        case Gamut::ACES2065_1: return "ACES2065_1";
+        case Gamut::REC2020: return "REC2020";
+        case Gamut::ERGB: return "ERGB";
+        case Gamut::XYZ: return "XYZ";
+        case Gamut::DCI_P3: return "DCI_P3";
+        case Gamut::NO_GAMUT: return "NO_GAMUT";
+    }
+    return "unknown";
+}
+
+std::pair<std::vector<float>, std::vector<float>> get_coeffs(Gamut gamut, size_t res) {
+    // check if values are cached
+    std::string fname = "coeffs_" + to_string(gamut) + "_" + std::to_string(res) + ".dat";
+    std::ifstream infile(fname);
+    if (infile) {
+        std::vector<float> scale(res);
+        std::vector<float> coeffs(3 * res * res * res * 3);
+        infile.read(reinterpret_cast<char*>(scale.data()), scale.size() * sizeof(float));
+        infile.read(reinterpret_cast<char*>(coeffs.data()), coeffs.size() * sizeof(float));
+        infile.close();
+        return {scale, coeffs};
+    }
+    // otherwise, optimize
+    auto [scale, coeffs] = optimize_coeffs(gamut, res);
+    // cache values before returning
+    std::ofstream outfile(fname, std::ios::out | std::ios::binary);
+    if (outfile) {
+        outfile.write(reinterpret_cast<const char*>(scale.data()), scale.size() * sizeof(float));
+        outfile.write(reinterpret_cast<const char*>(coeffs.data()), coeffs.size() * sizeof(float));
+        outfile.close();
+    }
+    return {scale, coeffs};
 }
 
 }

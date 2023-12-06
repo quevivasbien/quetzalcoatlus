@@ -5,7 +5,7 @@
 #include "rgb_to_spectrum_opt.hpp"
 #include "rgb.hpp"
 
-const size_t SPECTRUM_TABLE_RES = 24;
+const size_t SPECTRUM_TABLE_RES = 64;
 
 RGBColorSpace::RGBColorSpace(
     Vec2 r, Vec2 g, Vec2 b,
@@ -29,15 +29,15 @@ RGBColorSpace::RGBColorSpace(
     m_rgb_from_xyz = m_xyz_from_rgb.invert().value();
 }
 
-RGB RGBColorSpace::from_xyz(const XYZ& xyz) const {
+RGB RGBColorSpace::rgb_from_xyz(const XYZ& xyz) const {
     return RGB(m_rgb_from_xyz * xyz);
 }
-XYZ RGBColorSpace::to_xyz(const RGB& rgb) const {
+XYZ RGBColorSpace::rgb_to_xyz(const RGB& rgb) const {
     return XYZ(m_xyz_from_rgb * rgb);
 }
 
-RGB RGBColorSpace::from_sample(const SpectrumSample& ss) const {
-    return from_xyz(XYZ::from_sample(ss));
+RGB RGBColorSpace::rgb_from_sample(const SpectrumSample& ss) const {
+    return rgb_from_xyz(XYZ::from_sample(ss));
 }
 
 RGBSigmoidPolynomial RGBColorSpace::to_spectrum(const RGB& rgb) const {
@@ -160,7 +160,7 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB& rgb) const {
 std::shared_ptr<const RGBToSpectrumTable> RGBToSpectrumTable::sRGB() {
     static std::shared_ptr<const RGBToSpectrumTable> table;
     if (!table) {
-        auto [scale, coeffs] = opt_rgb::optimize_coeffs(opt_rgb::Gamut::SRGB, SPECTRUM_TABLE_RES);
+        auto [scale, coeffs] = opt_rgb::get_coeffs(opt_rgb::Gamut::SRGB, SPECTRUM_TABLE_RES);
         table = std::make_shared<RGBToSpectrumTable>(
             std::move(scale), std::move(coeffs)
         );

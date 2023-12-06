@@ -14,6 +14,9 @@ enum Gamut {
     NO_GAMUT,
 };
 
-std::pair<std::vector<float>, std::vector<float>> optimize_coeffs(Gamut gamut, size_t res);
+// get the coefficients for a given gamut at a given resolution
+// will try to get the coefficients from the file {gamut}_{res}.dat
+// if that doesn't exist, it will generate the coefficients (and save them after)
+std::pair<std::vector<float>, std::vector<float>> get_coeffs(Gamut gamut, size_t res);
 
 }
