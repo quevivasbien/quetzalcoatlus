@@ -19,7 +19,17 @@ public:
 
 class SolidColor : public Texture {
 public:
-    SolidColor(const RGB& color, const RGBColorSpace& cs);
+    explicit SolidColor(
+        const RGB& color,
+        const RGBColorSpace& cs = *RGBColorSpace::sRGB()
+    );
+
+    SolidColor(
+        float r, float g, float b,
+        const RGBColorSpace& cs = *RGBColorSpace::sRGB()
+    ) : SolidColor(RGB(r, g, b), cs) {}
+
+    explicit SolidColor(const std::shared_ptr<const Spectrum>& spectrum) : spectrum(spectrum) {}
 
     SpectrumSample value(
         const Vec2& uv,
@@ -27,7 +37,7 @@ public:
         const WavelengthSample& lambdas
     ) const override;
 
-    std::unique_ptr<Spectrum> spectrum;
+    std::shared_ptr<const Spectrum> spectrum;
 };
 
 

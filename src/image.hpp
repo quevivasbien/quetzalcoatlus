@@ -8,7 +8,8 @@ class Image {
 public:
     Image(size_t height, size_t width) : height(height), width(width), color_buffer(height * width * 3) {}
 
-    Image(std::vector<float>&& buffer, size_t height, size_t width) : width(width), height(height), color_buffer(buffer) {}
+    Image(const std::vector<float>& buffer, size_t height, size_t width) : height(height), width(width), color_buffer(buffer) {}
+    Image(std::vector<float>&& buffer, size_t height, size_t width) : height(height), width(width), color_buffer(buffer) {}
 
     void save(const std::string& filename, float gamma = 0.43) const;
 
@@ -32,6 +33,9 @@ public:
     ) : Image(std::move(color_buffer), height, width) {}
 
     virtual void denoise(bool verbose = false) override;
+
+    void save_normal(const std::string& filename) const;
+    void save_albedo(const std::string& filename) const;
 
     std::vector<float> normal_buffer;
     std::vector<float> albedo_buffer;

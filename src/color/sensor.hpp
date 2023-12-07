@@ -8,9 +8,6 @@
 class PixelSensor {
 public:
     PixelSensor(
-        const Spectrum& r,
-        const Spectrum& g,
-        const Spectrum& b,
         const RGBColorSpace& cs,
         const Spectrum& illuminant,
         float imaging_ratio

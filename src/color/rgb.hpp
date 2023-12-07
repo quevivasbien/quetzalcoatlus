@@ -79,7 +79,7 @@ class RGBUnboundedSpectrum : public Spectrum {
 public:
     RGBUnboundedSpectrum(const RGBSigmoidPolynomial& polynomial, float scale) : m_scale(scale), m_polynomial(polynomial) {};
 
-    RGBUnboundedSpectrum(const RGBColorSpace& cs, RGB rgb);
+    explicit RGBUnboundedSpectrum(RGB rgb, const RGBColorSpace& cs = *RGBColorSpace::sRGB());
 
     float operator()(float lambda) const override;
 
@@ -91,7 +91,7 @@ private:
 
 class RGBIlluminantSpectrum : public Spectrum {
 public:
-    RGBIlluminantSpectrum(const RGBColorSpace& cs, RGB rgb);
+    explicit RGBIlluminantSpectrum(RGB rgb, const RGBColorSpace& cs = *RGBColorSpace::sRGB());
 
     float operator()(float lambda) const override;
 

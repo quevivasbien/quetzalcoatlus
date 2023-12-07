@@ -19,6 +19,11 @@ struct PixelSample {
     SpectrumSample albedo;
 
     explicit PixelSample(const WavelengthSample& wavelengths) : color(0.0f, wavelengths), normal(0.0f, 0.0f, 0.0f), albedo(0.0f, wavelengths) {}
+    PixelSample(
+        const WavelengthSample& wavelengths,
+        const Vec3& normal,
+        const SpectrumSample& albedo
+    ) : color(0.0f, wavelengths), normal(normal), albedo(albedo) {}
 
     PixelSample& operator+=(const PixelSample& other) {
         color += other.color;
@@ -65,13 +70,11 @@ PixelSample sample_pixel(
     Sampler& sampler,
     size_t bounces
 ) {
-    PixelSample pixel_sample(wavelengths);
     auto isect = scene.ray_intersect(r, wavelengths, sampler);
     if (!isect) {
-        return pixel_sample;
+        return PixelSample(wavelengths);
     }
-    pixel_sample.normal = isect->normal;
-    pixel_sample.albedo = isect->color;
+    PixelSample pixel_sample(wavelengths, isect->normal, isect->color);
     if (!isect->new_ray || isect->pdf == 0.f) {
         pixel_sample.color = isect->color;
         return pixel_sample;
@@ -194,6 +197,9 @@ std::vector<PixelSample> sample_pixel(
         bounces-1
     );
     for (size_t i = 0; i < N; i++) {
+        if (valid[i] == 0) {
+            continue;
+        }
         samples[i].color = (
             isects[i]->color * isects[i]->pdf * inner_samples[i]
         ) / isects[i]->pdf;

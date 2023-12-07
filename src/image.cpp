@@ -93,3 +93,13 @@ void RenderResult::denoise(bool verbose) {
     normalBuf.read(0, width * height * 3 * sizeof(float), normal_buffer.data());
     albedoBuf.read(0, width * height * 3 * sizeof(float), albedo_buffer.data());
 }
+
+void RenderResult::save_normal(const std::string& filename) const {
+    Image normal_im(albedo_buffer, height, width);
+    normal_im.save(filename);
+}
+
+void RenderResult::save_albedo(const std::string& filename) const {
+    Image albedo_im(albedo_buffer, height, width);
+    albedo_im.save(filename);
+}

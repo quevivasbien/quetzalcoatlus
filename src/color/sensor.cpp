@@ -13,8 +13,8 @@ const Mat3 XYZ_FROM_LMS = Mat3({
 });
 
 Mat3 white_balance(Vec2 source_white, Vec2 target_white) {
-    auto source_xyz = XYZ::from_xyY(source_white);
-    auto target_xyz = XYZ::from_xyY(target_white);
+    auto source_xyz = XYZ::from_xyY(source_white.x, source_white.y);
+    auto target_xyz = XYZ::from_xyY(target_white.x, target_white.y);
     auto source_lms = LMS_FROM_XYZ * source_xyz;
     auto target_lms = LMS_FROM_XYZ * target_xyz;
 
@@ -27,32 +27,26 @@ Mat3 white_balance(Vec2 source_white, Vec2 target_white) {
 }
 
 PixelSensor::PixelSensor(
-    const Spectrum& r,
-    const Spectrum& g,
-    const Spectrum& b,
     const RGBColorSpace& cs,
     const Spectrum& illuminant,
     float imaging_ratio
-) : m_r(r), m_g(g), m_b(b), imaging_ratio(m_imaging_ratio) {
+) : m_r(*spectra::X()), m_g(*spectra::Y()), m_b(*spectra::Z()), m_imaging_ratio(imaging_ratio) {
     auto source_white = XYZ::from_spectrum(illuminant).xy();
-    auto target_white = cs.white();
+    auto target_white = cs.whitepoint();
     m_xyz_from_sensor_rgb = white_balance(source_white, target_white);
 }
 
 RGB PixelSensor::to_sensor_rgb(const SpectrumSample& sample) const {
     auto l = sample / SpectrumSample::from_wavelengths(sample.m_wavelengths);
-    return m_imaging_ratio * RGB(
-        SpectrumSample::from_spectrum(m_r * l, sample.m_wavelengths).average(),
-        SpectrumSample::from_spectrum(m_g * l, sample.m_wavelengths).average(),
-        SpectrumSample::from_spectrum(m_b * l, sample.m_wavelengths).average()
+    return RGB(
+        (SpectrumSample::from_spectrum(m_r, sample.m_wavelengths) * l).average() * m_imaging_ratio,
+        (SpectrumSample::from_spectrum(m_g, sample.m_wavelengths) * l).average() * m_imaging_ratio,
+        (SpectrumSample::from_spectrum(m_b, sample.m_wavelengths) * l).average() * m_imaging_ratio
     );
 }
 
 const PixelSensor& PixelSensor::CIE_XYZ() {
     static const PixelSensor sensor = PixelSensor(
-        *spectra::X(),
-        *spectra::Y(),
-        *spectra::Z(),
         *RGBColorSpace::sRGB(),
         *spectra::STD_ILLUM_D65(),
         1.0
