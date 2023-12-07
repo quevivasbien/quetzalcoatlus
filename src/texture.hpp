@@ -29,7 +29,7 @@ public:
         const RGBColorSpace& cs = *RGBColorSpace::sRGB()
     ) : SolidColor(RGB(r, g, b), cs) {}
 
-    explicit SolidColor(const std::shared_ptr<const Spectrum>& spectrum) : spectrum(spectrum) {}
+    explicit SolidColor(const std::shared_ptr<const Spectrum>& spectrum) : m_spectrum(spectrum) {}
 
     SpectrumSample value(
         const Vec2& uv,
@@ -37,7 +37,7 @@ public:
         const WavelengthSample& lambdas
     ) const override;
 
-    std::shared_ptr<const Spectrum> spectrum;
+    std::shared_ptr<const Spectrum> m_spectrum;
 };
 
 

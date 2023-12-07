@@ -79,6 +79,10 @@ int main() {
         std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() <<
         "ms" << std::endl;
 
+
+    result.save_albedo("textures_demo_albedo.png");
+    result.save_normal("textures_demo_normal.png");
+
     result.denoise();
     result.save("textures_demo.png");
 

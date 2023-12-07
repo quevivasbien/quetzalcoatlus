@@ -9,7 +9,7 @@
 #include "render.hpp"
 
 #define MULTITHREADED
-#define PACKET_SIZE 4
+// #define PACKET_SIZE 4
 
 const size_t THREAD_JOB_SIZE = 4096;
 

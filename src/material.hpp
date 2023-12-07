@@ -70,7 +70,7 @@ public:
     virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
         Vec3 new_dir = ray.d.reflect(isect.normal);
         if (roughness > 0.0f) {
-            new_dir += roughness * sampler.sample_uniform_sphere() * sampler.dist(sampler.rng);
+            new_dir += roughness * sampler.sample_uniform_sphere() * sampler.sample_1d();
         }
 
         return ScatterEvent(
@@ -103,7 +103,7 @@ public:
 
         float cos_theta = -normal.dot(ray.d);
         Vec3 new_dir;
-        if (reflectance(cos_theta, ior_ratio) > sampler.dist(sampler.rng)) {
+        if (reflectance(cos_theta, ior_ratio) > sampler.sample_1d()) {
             new_dir = ray.d.reflect(normal);
         }
         else {

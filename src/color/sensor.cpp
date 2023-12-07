@@ -49,7 +49,7 @@ const PixelSensor& PixelSensor::CIE_XYZ() {
     static const PixelSensor sensor = PixelSensor(
         *RGBColorSpace::sRGB(),
         *spectra::STD_ILLUM_D65(),
-        1.0
+        1.0 / spectra::CIE_Y_INTEGRAL
     );
     return sensor;
 }

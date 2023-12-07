@@ -1,23 +1,27 @@
 #include "random.hpp"
 
+// TODO: Get stratified sampling working properly
+
 float Sampler::sample_1d() {
-    uint32_t stratum = (sample_index + depth * 2048 + permutation_seed * 1028) % stratum_width;
-    depth++;
-    float dx = dist(rng);
-    return (float(stratum) + dx) / float(stratum_width);
+    return dist(rng);
+    // uint32_t stratum = (sample_index + depth * 2048 + permutation_seed * 1028) % stratum_width;
+    // depth++;
+    // float dx = dist(rng);
+    // return (float(stratum) + dx) / float(stratum_width);
 }
 
 Vec2 Sampler::sample_2d() {
-    uint32_t stratum = (sample_index + depth * 2048 + permutation_seed * 1028) % (stratum_width * stratum_width);
-    depth += 2;
-    float x = float(stratum % stratum_width);
-    float y = float(stratum / stratum_width);
-    float dx = dist(rng);
-    float dy = dist(rng);
-    return Vec2(
-        (x + dx) / float(stratum_width),
-        (y + dy) / float(stratum_width)
-    );
+    return Vec2(dist(rng), dist(rng));
+    // uint32_t stratum = (sample_index + depth * 2048 + permutation_seed * 1028) % (stratum_width * stratum_width);
+    // depth += 2;
+    // float x = float(stratum % stratum_width);
+    // float y = float(stratum / stratum_width);
+    // float dx = dist(rng);
+    // float dy = dist(rng);
+    // return Vec2(
+    //     (x + dx) / float(stratum_width),
+    //     (y + dy) / float(stratum_width)
+    // );
 }
 
 void Sampler::set_sample_index(uint32_t index) {
@@ -26,7 +30,7 @@ void Sampler::set_sample_index(uint32_t index) {
 }
 
 Vec2 Sampler::sample_uniform_disk() {
-    Vec2 uv(dist(rng), dist(rng));
+    Vec2 uv = sample_2d();
     Vec2 offset = 2.0f * uv - Vec2(1.0f, 1.0f);
     if (offset.x == 0.0f && offset.y == 0.0f) {
         return Vec2(0.0f, 0.0f);
@@ -44,7 +48,7 @@ Vec2 Sampler::sample_uniform_disk() {
 }
 
 Vec3 Sampler::sample_uniform_hemisphere() {
-    Vec2 uv(dist(rng), dist(rng));
+    Vec2 uv = sample_2d();
     float z = uv.x;
     float r = sqrtf(1.0f - z * z);
     float phi = 2.0f * M_PI * uv.y;
@@ -56,7 +60,7 @@ Vec3 Sampler::sample_uniform_hemisphere() {
 }
 
 Vec3 Sampler::sample_uniform_sphere() {
-    Vec2 uv(dist(rng), dist(rng));
+    Vec2 uv = sample_2d();
 
     float z = 1.0f - 2.0f * uv.x;
     float r = sqrtf(1.0f - z * z);
