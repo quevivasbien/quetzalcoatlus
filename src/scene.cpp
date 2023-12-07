@@ -119,7 +119,7 @@ std::array<std::optional<SceneIntersection>, N> rayhit_result(
     const RHN& rayhits,
     const std::array<Ray, N>& rays,
     const std::array<int, N>& valid,
-    const std::vector<WavelengthSample>& wavelengths,
+    const std::array<WavelengthSample, N>& wavelengths,
     Sampler& sampler
 ) {
     std::array<std::optional<SceneIntersection>, N> result;
@@ -160,7 +160,7 @@ std::array<std::optional<SceneIntersection>, N> rayhit_result(
 
 std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
     const std::array<Ray, 4>& rays,
-    const std::vector<WavelengthSample>& wavelengths,
+    const std::array<WavelengthSample, 4>& wavelengths,
     Sampler& sampler,
     const std::array<int, 4>& valid
 ) const {
@@ -172,7 +172,7 @@ std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
 
 std::array<std::optional<SceneIntersection>, 8> Scene::ray_intersect(
     const std::array<Ray, 8>& rays,
-    const std::vector<WavelengthSample>& wavelengths,
+    const std::array<WavelengthSample, 8>& wavelengths,
     Sampler& sampler,
     const std::array<int, 8>& valid
 ) const {

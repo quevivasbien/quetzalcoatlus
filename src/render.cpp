@@ -8,9 +8,13 @@
 #include "color/color.hpp"
 #include "render.hpp"
 
+// if defined, run in multithreaded mode, helpful to disable when debugging
 #define MULTITHREADED
+// if defined, test for more than 1 intersection at a time
+// NOTE: I've currently only been able to get a packet size of 4 to work, though 8 should work hypothetically
 // #define PACKET_SIZE 4
 
+// the number of pixels given to a single thread at a time
 const size_t THREAD_JOB_SIZE = 4096;
 
 struct PixelSample {
@@ -18,12 +22,11 @@ struct PixelSample {
     Vec3 normal;
     SpectrumSample albedo;
 
-    explicit PixelSample(const WavelengthSample& wavelengths) : color(0.0f, wavelengths), normal(0.0f, 0.0f, 0.0f), albedo(0.0f, wavelengths) {}
+    PixelSample() : color(0.0f), normal(0.0f, 0.0f, 0.0f), albedo(0.0f) {}
     PixelSample(
-        const WavelengthSample& wavelengths,
         const Vec3& normal,
         const SpectrumSample& albedo
-    ) : color(0.0f, wavelengths), normal(normal), albedo(albedo) {}
+    ) : color(0.0f), normal(normal), albedo(albedo) {}
 
     PixelSample& operator+=(const PixelSample& other) {
         color += other.color;
@@ -48,11 +51,11 @@ SpectrumSample sample_pixel_inner(
     size_t bounces
 ) {
     if (bounces == 0) {
-        return SpectrumSample(0.0f, wavelengths);
+        return SpectrumSample(0.0);
     }
     auto isect = scene.ray_intersect(r, wavelengths, sampler);
     if (!isect) {
-        return SpectrumSample(0.0f, wavelengths);
+        return SpectrumSample(0.0f);
     }
     if (!isect->new_ray || isect->pdf == 0.f) {
         return isect->color;
@@ -72,9 +75,9 @@ PixelSample sample_pixel(
 ) {
     auto isect = scene.ray_intersect(r, wavelengths, sampler);
     if (!isect) {
-        return PixelSample(wavelengths);
+        return PixelSample();
     }
-    PixelSample pixel_sample(wavelengths, isect->normal, isect->color);
+    PixelSample pixel_sample(isect->normal, isect->color);
     if (!isect->new_ray || isect->pdf == 0.f) {
         pixel_sample.color = isect->color;
         return pixel_sample;
@@ -88,19 +91,15 @@ PixelSample sample_pixel(
 }
 
 template <size_t N>
-std::vector<SpectrumSample> sample_pixel_inner(
+std::array<SpectrumSample, N> sample_pixel_inner(
     const std::array<Ray, N>& rays,
     const std::array<int, N>& valid,
     const Scene& scene,
-    const std::vector<WavelengthSample>& wavelengths,
+    const std::array<WavelengthSample, N>& wavelengths,
     Sampler& sampler,
     size_t bounces
 ) {
-    std::vector<SpectrumSample> samples;
-    samples.reserve(N);
-    for (size_t i = 0; i < N; i++) {
-        samples.push_back(SpectrumSample(0.0f, wavelengths[i]));
-    }
+    std::array<SpectrumSample, N> samples {};
     if (bounces == 0) {
         return samples;
     }
@@ -118,23 +117,40 @@ std::vector<SpectrumSample> sample_pixel_inner(
         new_rays[i] = *isects[i]->new_ray;
         new_valid[i] = -1;
     }
-    bool exit = true;
-    for (size_t i = 0; i < N; i++) {
-        if (new_valid[i] != 0) {
-            exit = false;
-            break;
-        }
-    }
-    if (exit) {
+    
+    int n_valid = std::accumulate(new_valid.begin(), new_valid.end(), 0);
+    if (n_valid == 0) {
         return samples;
     }
-    auto inner_samples = sample_pixel_inner(
-        new_rays, new_valid,
-        scene,
-        wavelengths,
-        sampler,
-        bounces-1
-    );
+
+    std::array<SpectrumSample, N> inner_samples;
+    // there's just one active ray left, switch to single sampling, otherwise recurse deeper
+    if (n_valid == -1) {
+        for (size_t i = 0; i < N; i++) {
+            if (valid[i] == 0) {
+                inner_samples[i] = SpectrumSample(0.0f);
+            }
+            else {
+                inner_samples[i] = sample_pixel_inner(
+                    rays[i],
+                    scene,
+                    wavelengths[i],
+                    sampler,
+                    bounces-1
+                );
+            }
+        }
+    }
+    else {
+        inner_samples = sample_pixel_inner(
+            new_rays, new_valid,
+            scene,
+            wavelengths,
+            sampler,
+            bounces-1
+        );
+    }
+
     for (size_t i = 0; i < N; i++) {
         if (new_valid[i] == 0) {
             continue;
@@ -147,18 +163,14 @@ std::vector<SpectrumSample> sample_pixel_inner(
 }
 
 template <size_t N>
-std::vector<PixelSample> sample_pixel(
+std::array<PixelSample, N> sample_pixel(
     const std::array<Ray, N>& rays,
     const Scene& scene,
-    const std::vector<WavelengthSample>& wavelengths,
+    const std::array<WavelengthSample, N>& wavelengths,
     Sampler& sampler,
     size_t bounces
 ) {
-    std::vector<PixelSample> samples;
-    samples.reserve(N);
-    for (size_t i = 0; i < N; i++) {
-        samples.push_back(PixelSample(wavelengths[i]));
-    }
+    std::array<PixelSample, N> samples{};
     // valid = -1 means we want to continue tracing this ray
     // valid = 0 means we want to stop tracing this ray
     // this is just based on embree syntax for rtcIntersect4/8/16
@@ -236,8 +248,7 @@ void render_pixels(
         size_t rem  = n_samples % PACKET_SIZE;
         for (size_t chunk = 0; chunk < n_chunks; chunk++) {
             std::array<Ray, PACKET_SIZE> rays;
-            std::vector<WavelengthSample> wavelengths;
-            wavelengths.reserve(PACKET_SIZE);
+            std::array<WavelengthSample, PACKET_SIZE> wavelengths;
             for (size_t ss = 0; ss < PACKET_SIZE; ss++) {
                 sampler.set_sample_index(chunk * PACKET_SIZE + ss);
                 auto jitter = sampler.sample_2d();
@@ -245,13 +256,13 @@ void render_pixels(
                 float v = float(y) + jitter.y;
                 rays[ss] = camera.cast_ray(u, v);
                 float w = sampler.sample_1d();
-                wavelengths.push_back(WavelengthSample::uniform(w));
+                wavelengths[ss] = WavelengthSample::uniform(w);
             }
             auto samples = sample_pixel(rays, scene, wavelengths, sampler, max_bounces);
-            for (size_t s = 0; s < PACKET_SIZE; s++) {
-                color += PixelSensor::CIE_XYZ().to_sensor_rgb(samples[s].color);
-                albedo = PixelSensor::CIE_XYZ().to_sensor_rgb(samples[s].albedo);
-                normal += samples[s].normal;
+            for (size_t ss = 0; ss < PACKET_SIZE; ss++) {
+                color += camera.sensor.to_sensor_rgb(samples[ss].color, wavelengths[ss]);
+                albedo = camera.sensor.to_sensor_rgb(samples[ss].albedo, wavelengths[ss]);
+                normal += samples[ss].normal;
             }
         }
         for (size_t s = 0; s < rem; s++) {
@@ -262,8 +273,8 @@ void render_pixels(
             Ray r = camera.cast_ray(u, v);
             WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
             auto sample = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
-            color += PixelSensor::CIE_XYZ().to_sensor_rgb(sample.color);
-            albedo += PixelSensor::CIE_XYZ().to_sensor_rgb(sample.albedo);
+            color += camera.sensor.to_sensor_rgb(sample.color, wavelengths);
+            albedo += camera.sensor.to_sensor_rgb(sample.albedo, wavelengths);
             normal += sample.normal;
         }
         #else
@@ -275,8 +286,8 @@ void render_pixels(
             Ray r = camera.cast_ray(u, v);
             WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
             auto sample = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
-            color += PixelSensor::CIE_XYZ().to_sensor_rgb(sample.color);
-            albedo += PixelSensor::CIE_XYZ().to_sensor_rgb(sample.albedo);
+            color += camera.sensor.to_sensor_rgb(sample.color, wavelengths);
+            albedo += camera.sensor.to_sensor_rgb(sample.albedo, wavelengths);
             normal += sample.normal;
         }
         #endif

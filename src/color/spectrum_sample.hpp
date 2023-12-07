@@ -17,6 +17,8 @@ public:
         SampleArray&& pdf
     );
 
+    WavelengthSample() {};
+
     static WavelengthSample uniform(float u, float lambda_min = LAMBDA_MIN, float lambda_max = LAMBDA_MAX);
 
     bool secondary_terminated() const;
@@ -34,16 +36,14 @@ class SpectrumSample {
 public:
     using SampleArray = std::array<float, N_SPECTRUM_SAMPLES>;
 
-    SpectrumSample(
-        SampleArray&& values,
-        const WavelengthSample& wavelengths
-    ) : m_values(std::move(values)), m_wavelengths(wavelengths) {}
+    explicit SpectrumSample(const SampleArray& values) : m_values(values) {}
+    explicit SpectrumSample(SampleArray&& values) : m_values(std::move(values)) {}
     
-    SpectrumSample(
-        float c, const WavelengthSample& wavelengths
-    ) : m_wavelengths(wavelengths) {
+    explicit SpectrumSample(float c) {
         m_values.fill(c);
     }
+
+    SpectrumSample() : m_values({}) {}
 
     static SpectrumSample from_spectrum(const Spectrum& spectrum, const WavelengthSample& wavelengths);
 
@@ -80,7 +80,7 @@ public:
         for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
             values[i] = f(m_values[i]);
         }
-        return SpectrumSample(values, m_wavelengths);
+        return SpectrumSample(std::move(values));
     }
 
     template <typename F>
@@ -94,6 +94,5 @@ public:
     static SpectrumSample from_wavelengths(const WavelengthSample& wavelengths);
 
     SampleArray m_values;
-    WavelengthSample m_wavelengths;
 };
 

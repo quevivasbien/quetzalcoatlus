@@ -52,14 +52,14 @@ public:
     // intersect a packet of 4 rays with the scene
     std::array<std::optional<SceneIntersection>, 4> ray_intersect(
         const std::array<Ray, 4>& rays,
-        const std::vector<WavelengthSample>& wavelengths,
+        const std::array<WavelengthSample, 4>& wavelengths,
         Sampler& sampler,
         const std::array<int, 4>& valid = { -1, -1, -1, -1 }
     ) const;
     // intersect a packet of 8 rays with the scene
     std::array<std::optional<SceneIntersection>, 8> ray_intersect(
         const std::array<Ray, 8>& rays,
-        const std::vector<WavelengthSample>& wavelengths,
+        const std::array<WavelengthSample, 8>& wavelengths,
         Sampler& sampler,
         const std::array<int, 8>& valid = { -1, -1, -1, -1, -1, -1, -1, -1 }
     ) const;

@@ -10,7 +10,7 @@
 int main() {
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(2.0f, 2.0f, 2.0f));
+    EmissiveMaterial light(SolidColor(std::make_shared<RGBIlluminantSpectrum>(RGB(8., 4., 4.))));
     scene.add_quad(
         Pt3(-2.f, 5.f, -7.f),
         Pt3(2.f, 5.f, -7.f),
@@ -62,7 +62,7 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 9;
+    size_t n_samples = 36;
     size_t max_bounces = 32;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<

@@ -36,21 +36,44 @@ PixelSensor::PixelSensor(
     m_xyz_from_sensor_rgb = white_balance(source_white, target_white);
 }
 
-RGB PixelSensor::to_sensor_rgb(const SpectrumSample& sample) const {
-    auto l = sample / SpectrumSample::from_wavelengths(sample.m_wavelengths);
+PixelSensor::PixelSensor(
+    const Spectrum& r,
+    const Spectrum& g,
+    const Spectrum& b,
+    const RGBColorSpace& cs,
+    const Spectrum& illuminant,
+    float imaging_ratio
+) : m_r(r), m_g(g), m_b(b), m_imaging_ratio(imaging_ratio) {
+    // TODO: figure out how to do color correction like in pbrt
+    auto source_white = XYZ::from_spectrum(illuminant).xy();
+    auto target_white = cs.whitepoint();
+    m_xyz_from_sensor_rgb = white_balance(source_white, target_white);
+}
+
+RGB PixelSensor::to_sensor_rgb(const SpectrumSample& sample, const WavelengthSample& wavelengths) const {
+    auto l = sample / SpectrumSample::from_wavelengths(wavelengths);
     return RGB(
-        (SpectrumSample::from_spectrum(m_r, sample.m_wavelengths) * l).average() * m_imaging_ratio,
-        (SpectrumSample::from_spectrum(m_g, sample.m_wavelengths) * l).average() * m_imaging_ratio,
-        (SpectrumSample::from_spectrum(m_b, sample.m_wavelengths) * l).average() * m_imaging_ratio
+        (SpectrumSample::from_spectrum(m_r, wavelengths) * l).average() * m_imaging_ratio,
+        (SpectrumSample::from_spectrum(m_g, wavelengths) * l).average() * m_imaging_ratio,
+        (SpectrumSample::from_spectrum(m_b, wavelengths) * l).average() * m_imaging_ratio
     );
 }
 
-const PixelSensor& PixelSensor::CIE_XYZ() {
-    static const PixelSensor sensor = PixelSensor(
+PixelSensor PixelSensor::CIE_XYZ(float imaging_ratio) {
+    return PixelSensor(
         *RGBColorSpace::sRGB(),
-        *spectra::STD_ILLUM_D65(),
-        1.0 / spectra::CIE_Y_INTEGRAL
+        *spectra::ILLUM_D65(),
+        imaging_ratio
     );
-    return sensor;
 }
 
+PixelSensor PixelSensor::CANON_EOS(float imaging_ratio) {
+    return PixelSensor(
+        *spectra::CANON_EOS_R(),
+        *spectra::CANON_EOS_G(),
+        *spectra::CANON_EOS_B(),
+        *RGBColorSpace::sRGB(),
+        *spectra::ILLUM_D65(),
+        imaging_ratio
+    );
+}

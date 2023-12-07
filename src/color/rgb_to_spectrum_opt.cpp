@@ -786,7 +786,8 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
 
 
 std::pair<std::vector<float>, std::vector<float>> optimize_coeffs(Gamut gamut, size_t res) {
-    
+    std::cout << "Optimizing RGB -> spectrum coeffs" << std::endl;
+
     init_tables(gamut);
 
     int nThreads = AvailableCores();

@@ -11,7 +11,7 @@ public:
     Image(const std::vector<float>& buffer, size_t height, size_t width) : height(height), width(width), color_buffer(buffer) {}
     Image(std::vector<float>&& buffer, size_t height, size_t width) : height(height), width(width), color_buffer(buffer) {}
 
-    void save(const std::string& filename, float gamma = 0.43) const;
+    void save(const std::string& filename, float gamma = 1.0) const;
 
     virtual void denoise(bool verbose = false);
 

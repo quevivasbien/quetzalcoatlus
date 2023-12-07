@@ -36,7 +36,7 @@ int main(int argc, const char* const argv[]) {
 
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(spectra::STD_ILLUM_D65()));
+    EmissiveMaterial light(SolidColor(spectra::ILLUM_D65()));
     scene.add_plane(
         Pt3(0., 100., 100.),
         Vec3(0., -1., -1.).normalize(),

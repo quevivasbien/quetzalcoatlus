@@ -5,6 +5,7 @@
 
 #include "rgb_to_spectrum_opt.hpp"
 #include "rgb.hpp"
+#include "spectra.hpp"
 
 const size_t SPECTRUM_TABLE_RES = 64;
 
@@ -41,8 +42,8 @@ XYZ RGBColorSpace::rgb_to_xyz(const RGB& rgb) const {
     return XYZ(m_xyz_from_rgb * rgb);
 }
 
-RGB RGBColorSpace::rgb_from_sample(const SpectrumSample& ss) const {
-    return rgb_from_xyz(XYZ::from_sample(ss));
+RGB RGBColorSpace::rgb_from_sample(const SpectrumSample& ss, const WavelengthSample& wl) const {
+    return rgb_from_xyz(XYZ::from_sample(ss, wl));
 }
 
 RGBSigmoidPolynomial RGBColorSpace::to_spectrum(const RGB& rgb) const {
@@ -160,7 +161,7 @@ std::shared_ptr<const RGBColorSpace> RGBColorSpace::sRGB() {
             Vec2(0.64, 0.33),
             Vec2(0.3, 0.6),
             Vec2(0.15, 0.06),
-            spectra::STD_ILLUM_D65(),
+            spectra::ILLUM_D65(),
             RGBToSpectrumTable::sRGB()
         );
     }

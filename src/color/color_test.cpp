@@ -26,8 +26,9 @@ int main() {
 
     std::cout << "Sensor sampled RGB values:" << std::endl;
     for (float x = 0.0f; x < 1.0f; x += 0.1f) {
-        auto sample = SpectrumSample::from_spectrum(spectrum, WavelengthSample::uniform(x));
-        auto color_out = PixelSensor::CIE_XYZ().to_sensor_rgb(sample);
+        auto wl = WavelengthSample::uniform(x);
+        auto sample = SpectrumSample::from_spectrum(spectrum, wl);
+        auto color_out = PixelSensor::CIE_XYZ().to_sensor_rgb(sample, wl);
         std::cout << color_out.x << " " << color_out.y << " " << color_out.z << std::endl;
     }
 

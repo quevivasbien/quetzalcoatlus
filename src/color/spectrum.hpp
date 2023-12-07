@@ -13,6 +13,7 @@ public:
 
     virtual float operator()(float lambda) const = 0;
 
+    float integral() const;
     float inner_product(const Spectrum& other) const;
 };
 
@@ -79,14 +80,3 @@ private:
     float m_t;
     float m_normalization_factor;
 };
-
-
-namespace spectra {
-    const float CIE_Y_INTEGRAL = 106.856895f;
-
-    std::shared_ptr<const DenselySampledSpectrum> X();
-    std::shared_ptr<const DenselySampledSpectrum> Y();
-    std::shared_ptr<const DenselySampledSpectrum> Z();
-
-    std::shared_ptr<const PiecewiseLinearSpectrum> STD_ILLUM_D65();
-}

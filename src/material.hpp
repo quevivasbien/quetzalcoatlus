@@ -145,7 +145,7 @@ public:
         else {
             return ScatterEvent(
                 std::nullopt,
-                SpectrumSample(0.0f, isect.lambdas)
+                SpectrumSample(0.0f)
             );
         }
     }

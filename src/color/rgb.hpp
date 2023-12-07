@@ -52,7 +52,7 @@ public:
     RGB rgb_from_xyz(const XYZ& xyz) const;
     XYZ rgb_to_xyz(const RGB& rgb) const;
 
-    RGB rgb_from_sample(const SpectrumSample& ss) const;
+    RGB rgb_from_sample(const SpectrumSample& ss, const WavelengthSample& wl) const;
 
     RGBSigmoidPolynomial to_spectrum(const RGB& rgb) const;
 

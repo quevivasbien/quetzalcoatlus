@@ -12,7 +12,7 @@ public:
 
     static XYZ from_spectrum(const Spectrum& spectrum);
     
-    static XYZ from_sample(const SpectrumSample& ss);
+    static XYZ from_sample(const SpectrumSample& ss, const WavelengthSample& wavelengths);
 
     Vec2 xy() const;
 

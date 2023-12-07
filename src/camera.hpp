@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cmath>
 
+#include "color/color.hpp"
 #include "vec.hpp"
 #include "ray.hpp"
 #include "transform.hpp"
@@ -13,7 +14,8 @@ public:
         size_t image_width,
         size_t image_height,
         float fov,
-        const Transform& transform = Transform::identity()
+        const Transform& transform = Transform::identity(),
+        PixelSensor&& sensor = PixelSensor::CANON_EOS()
     );
 
     // creates a ray pointing to the pixel coordinates (u, v)
@@ -28,4 +30,6 @@ public:
     Vec3 viewport_bottom_left;
     Vec3 pixel_delta_u;
     Vec3 pixel_delta_v;
+
+    PixelSensor sensor;
 };
