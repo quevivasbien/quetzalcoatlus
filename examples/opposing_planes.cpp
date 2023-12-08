@@ -8,21 +8,23 @@
 int main() {
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(1.2, 1.2, 1.2));
+    EmissiveMaterial light(SolidColor(
+        std::make_shared<RGBIlluminantSpectrum>(RGB(2.6, 0.8, 1.2))
+    ));
     scene.add_plane(
         Pt3(0., 0., 5.),
         Vec3(-1., 0., -1.).normalize(),
         &light
     );
 
-    SpecularMaterial right_plane(SolidColor(221. / 255., 10. / 255., 5. / 255.), 0.1);
+    SpecularMaterial right_plane(SolidColor(221. / 255., 15. / 255., 110. / 255.), 0.1);
     scene.add_plane(
         Pt3(0., 0., -10.),
         Vec3(-0.5, 0.5, 1.).normalize(),
         &right_plane
     );
 
-    SpecularMaterial left_plane(SolidColor(10. / 255., 5. / 255., 200. / 255.), 0.1);
+    SpecularMaterial left_plane(SolidColor(19. / 255., 70. / 255., 180. / 255.), 0.1);
     scene.add_plane(
         Pt3(0., 0., -10.),
         Vec3(0.5, -0.5, 1.).normalize(),

@@ -223,7 +223,7 @@ std::array<PixelSample, N> sample_pixel(
 void render_pixels(
     const Camera& camera,
     const Scene& scene,
-    size_t n_samples,
+    Sampler& sampler,
     size_t max_bounces,
     RenderResult& result,
     size_t start_index,
@@ -231,12 +231,8 @@ void render_pixels(
     size_t& global_index,
     std::mutex& mutex
 ) {
-    uint32_t stratum_width = sqrtl(n_samples);
+    int n_samples = sampler.samples_per_pixel();
     for (size_t i = start_index; i < end_index; i++) {
-        Sampler sampler(
-            static_cast<uint32_t>(i),
-            stratum_width
-        );
         size_t x = i % camera.image_width;
         size_t y = camera.image_height - i / camera.image_width - 1;
 
@@ -250,8 +246,8 @@ void render_pixels(
             std::array<Ray, PACKET_SIZE> rays;
             std::array<WavelengthSample, PACKET_SIZE> wavelengths;
             for (size_t ss = 0; ss < PACKET_SIZE; ss++) {
-                sampler.set_sample_index(chunk * PACKET_SIZE + ss);
-                auto jitter = sampler.sample_2d();
+                sampler.start_pixel_sample(x, y, chunk * PACKET_SIZE + ss);
+                auto jitter = sampler.sample_pixel_2d();
                 float u = float(x) + jitter.x;
                 float v = float(y) + jitter.y;
                 rays[ss] = camera.cast_ray(u, v);
@@ -266,8 +262,8 @@ void render_pixels(
             }
         }
         for (size_t s = 0; s < rem; s++) {
-            sampler.set_sample_index(n_chunks * 4 + s);
-            auto jitter = sampler.sample_2d();
+            sampler.start_pixel_sample(x, y, n_chunks * 4 + s);
+            auto jitter = sampler.sample_pixel_2d();
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
@@ -279,8 +275,8 @@ void render_pixels(
         }
         #else
         for (size_t s = 0; s < n_samples; s++) {
-            sampler.set_sample_index(s);
-            auto jitter = sampler.sample_2d();
+            sampler.start_pixel_sample(x, y, s);
+            auto jitter = sampler.sample_pixel();
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
@@ -320,7 +316,7 @@ void render_pixels(
     render_pixels(
         camera,
         scene,
-        n_samples,
+        sampler,
         max_bounces,
         result,
         start_index,
@@ -360,10 +356,14 @@ RenderResult render(
         std::thread::hardware_concurrency(),
         1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
     );
-    #else
-    size_t n_threads = 1;
-    #endif
     std::cout << "Using " << n_threads << " threads" << std::endl;
+
+    std::vector<HaltonSampler> samplers;
+    samplers.reserve(n_threads);
+    for (size_t t = 0; t < n_threads; t++) {
+        samplers.push_back(HaltonSampler(n_samples, camera.image_width, camera.image_height, t));
+    }
+
     size_t end_index = 0;
     std::mutex mutex;
     for (size_t t = 0; t < n_threads; t++) {
@@ -375,11 +375,12 @@ RenderResult render(
                 end_index = image_size;
             }
         }
+
         threads.push_back(std::thread(
             render_pixels,
-            camera,
+            std::ref(camera),
             std::ref(scene),
-            n_samples,
+            std::ref(samplers[t]),
             max_bounces,
             std::ref(result),
             start_index,
@@ -391,6 +392,15 @@ RenderResult render(
     for (auto& t : threads) {
         t.join();
     }
+    #else
+    // Single threaded render
+    HaltonSampler sampler(n_samples, camera.image_width, camera.image_height, 0);
+    std::mutex _mutex;
+    render_pixels(
+        camera, scene, sampler, max_bounces,
+        result, 0, image_size, image_size, _mutex
+    );
+    #endif
 
     return result;
 }
