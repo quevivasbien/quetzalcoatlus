@@ -5,6 +5,7 @@
 
 #include "rgb_to_spectrum_opt.hpp"
 #include "rgb.hpp"
+#include "spectra.hpp"
 
 const size_t SPECTRUM_TABLE_RES = 64;
 
@@ -41,8 +42,8 @@ XYZ RGBColorSpace::rgb_to_xyz(const RGB& rgb) const {
     return XYZ(m_xyz_from_rgb * rgb);
 }
 
-RGB RGBColorSpace::rgb_from_sample(const SpectrumSample& ss) const {
-    return rgb_from_xyz(XYZ::from_sample(ss));
+RGB RGBColorSpace::rgb_from_sample(const SpectrumSample& ss, const WavelengthSample& wl) const {
+    return rgb_from_xyz(XYZ::from_sample(ss, wl));
 }
 
 RGBSigmoidPolynomial RGBColorSpace::to_spectrum(const RGB& rgb) const {
@@ -160,9 +161,36 @@ std::shared_ptr<const RGBColorSpace> RGBColorSpace::sRGB() {
             Vec2(0.64, 0.33),
             Vec2(0.3, 0.6),
             Vec2(0.15, 0.06),
-            spectra::STD_ILLUM_D65(),
+            spectra::ILLUM_D65(),
             RGBToSpectrumTable::sRGB()
         );
     }
     return space;
+}
+
+
+RGBUnboundedSpectrum::RGBUnboundedSpectrum(RGB rgb, const RGBColorSpace& cs) {
+    m_scale = 2 * std::max({rgb.x, rgb.y, rgb.z});
+    RGB rgb_ = m_scale ? RGB(rgb / m_scale) : RGB(0, 0, 0);
+    m_polynomial = cs.to_spectrum(rgb_);
+}
+
+float RGBUnboundedSpectrum::operator()(float lambda) const {
+    return m_scale * m_polynomial(lambda);
+}
+
+
+RGBIlluminantSpectrum::RGBIlluminantSpectrum(
+    RGB rgb, const RGBColorSpace& cs
+) : m_illuminant(cs.m_illuminant) {
+    m_scale = 2 * std::max({rgb.x, rgb.y, rgb.z});
+    RGB rgb_ = m_scale ? RGB(rgb / m_scale) : RGB(0, 0, 0);
+    m_polynomial = cs.to_spectrum(rgb_);
+}
+
+float RGBIlluminantSpectrum::operator()(float lambda) const {
+    if (!m_illuminant) {
+        return 0.0f;
+    }
+    return m_scale * m_polynomial(lambda) * (*m_illuminant)(lambda);
 }

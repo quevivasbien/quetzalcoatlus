@@ -17,11 +17,15 @@ public:
         SampleArray&& pdf
     );
 
+    WavelengthSample() {};
+
     static WavelengthSample uniform(float u, float lambda_min = LAMBDA_MIN, float lambda_max = LAMBDA_MAX);
 
     bool secondary_terminated() const;
 
     void terminate_secondary();
+
+    bool operator==(const WavelengthSample& other) const;
 
     SampleArray m_lambdas;
     SampleArray m_pdf;
@@ -32,18 +36,16 @@ class SpectrumSample {
 public:
     using SampleArray = std::array<float, N_SPECTRUM_SAMPLES>;
 
-    SpectrumSample(
-        SampleArray&& values,
-        const std::shared_ptr<const WavelengthSample>& wavelengths
-    ) : m_values(std::move(values)), m_wavelengths(wavelengths) {}
+    explicit SpectrumSample(const SampleArray& values) : m_values(values) {}
+    explicit SpectrumSample(SampleArray&& values) : m_values(std::move(values)) {}
     
-    SpectrumSample(
-        float c, const std::shared_ptr<const WavelengthSample>& wavelengths
-    ) : m_wavelengths(wavelengths) {
+    explicit SpectrumSample(float c) {
         m_values.fill(c);
     }
 
-    static SpectrumSample from_spectrum(const Spectrum& spectrum, std::shared_ptr<const WavelengthSample> wavelengths);
+    SpectrumSample() : m_values({}) {}
+
+    static SpectrumSample from_spectrum(const Spectrum& spectrum, const WavelengthSample& wavelengths);
 
     float operator[](size_t i) const { return m_values[i]; }
     float& operator[](size_t i) { return m_values[i]; }
@@ -60,6 +62,15 @@ public:
     SpectrumSample operator/(const SpectrumSample& other) const;
     SpectrumSample& operator/=(const SpectrumSample& other);
 
+    SpectrumSample operator+(float c) const;
+    SpectrumSample& operator+=(float c);
+    SpectrumSample operator-(float c) const;
+    SpectrumSample& operator-=(float c);
+    SpectrumSample operator*(float c) const;
+    SpectrumSample& operator*=(float c);
+    SpectrumSample operator/(float c) const;
+    SpectrumSample& operator/=(float c);
+
     float average() const;
 
     // pointwise map
@@ -69,7 +80,7 @@ public:
         for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
             values[i] = f(m_values[i]);
         }
-        return SpectrumSample(values, m_wavelengths);
+        return SpectrumSample(std::move(values));
     }
 
     template <typename F>
@@ -80,9 +91,8 @@ public:
     }
 
     // construct new spectrum from wavelengths pdf
-    SpectrumSample new_from_pdf() const;
+    static SpectrumSample from_wavelengths(const WavelengthSample& wavelengths);
 
     SampleArray m_values;
-    std::shared_ptr<const WavelengthSample> m_wavelengths;
 };
 

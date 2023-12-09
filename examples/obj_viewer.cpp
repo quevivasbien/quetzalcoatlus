@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <string>
 #include "render.hpp"
 
@@ -34,13 +35,14 @@ int main(int argc, const char* const argv[]) {
     }
 
     Scene scene(initialize_device());
-    EmissiveMaterial light(SolidColor(1.0, 1.0, 1.0));
+
+    EmissiveMaterial light(SolidColor(spectra::ILLUM_D65()));
     scene.add_plane(
         Pt3(0., 100., 100.),
         Vec3(0., -1., -1.).normalize(),
         &light
     );
-    LambertMaterial material(SolidColor(0.8, 0.8, 0.8));
+    LambertMaterial material(SolidColor(0.9, 0.7, 0.8));
     scene.add_obj(filename, &material);
     scene.commit();
 
@@ -57,11 +59,15 @@ int main(int argc, const char* const argv[]) {
     size_t max_bounces = 64;
 
     auto result = render(camera, scene, n_samples, max_bounces);
-    result.denoise();
 
-    // get filename by removing .obj and adding .png
-    std::string filename_png = filename.substr(0, filename.length() - 4) + ".png";
-    result.save(filename_png);
+    // get filename base by removing .obj
+    std::string filename_base = filename.substr(0, filename.length() - 4);
+
+    result.save_albedo(filename_base + "_albedo.png");
+    result.save_normal(filename_base + "_normal.png");
+
+    result.denoise();
+    result.save(filename_base + ".png");
 
     return 0;
 }

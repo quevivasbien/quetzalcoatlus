@@ -9,6 +9,7 @@
 
 #include <embree4/rtcore.h>
 
+#include "color/color.hpp"
 #include "material.hpp"
 #include "random.hpp"
 #include "ray.hpp"
@@ -47,16 +48,18 @@ public:
     bool ready() const { return m_ready; }
 
     // intersect a single ray with the scene
-    std::optional<SceneIntersection> ray_intersect(const Ray& ray, Sampler& sampler) const;
+    std::optional<SceneIntersection> ray_intersect(const Ray& ray, const WavelengthSample& wavelengths, Sampler& sampler) const;
     // intersect a packet of 4 rays with the scene
     std::array<std::optional<SceneIntersection>, 4> ray_intersect(
         const std::array<Ray, 4>& rays,
+        const std::array<WavelengthSample, 4>& wavelengths,
         Sampler& sampler,
         const std::array<int, 4>& valid = { -1, -1, -1, -1 }
     ) const;
     // intersect a packet of 8 rays with the scene
     std::array<std::optional<SceneIntersection>, 8> ray_intersect(
         const std::array<Ray, 8>& rays,
+        const std::array<WavelengthSample, 8>& wavelengths,
         Sampler& sampler,
         const std::array<int, 8>& valid = { -1, -1, -1, -1, -1, -1, -1, -1 }
     ) const;

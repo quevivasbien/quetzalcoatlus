@@ -1,5 +1,6 @@
 #pragma once
 
+#include "color/color.hpp"
 #include "onb.hpp"
 #include "random.hpp"
 #include "ray.hpp"
@@ -14,17 +15,24 @@ struct ShapeIntersection {
     Vec3 normal;
     Pt3 point;
     bool outer_face;
+    WavelengthSample lambdas;
 
-    ShapeIntersection(Vec2 uv, Vec3 normal, Pt3 point, bool outer_face) : uv(uv), normal(normal), point(point), outer_face(outer_face) {}
+    ShapeIntersection(
+        Vec2 uv,
+        Vec3 normal,
+        Pt3 point,
+        bool outer_face,
+        const WavelengthSample& lambdas
+    ) : uv(uv), normal(normal), point(point), outer_face(outer_face), lambdas(lambdas) {}
 };
 
 
 struct ScatterEvent {
     std::optional<Ray> new_ray;
-    Vec3 color;
+    SpectrumSample color;
     float pdf;
 
-    ScatterEvent(std::optional<Ray> new_ray, Vec3 color, float pdf = 1.0f) : new_ray(new_ray), color(color), pdf(pdf) {}
+    ScatterEvent(std::optional<Ray>&& new_ray, SpectrumSample&& color, float pdf = 1.0f) : new_ray(std::move(new_ray)), color(std::move(color)), pdf(pdf) {}
 };
 
 
@@ -43,10 +51,9 @@ public:
         OrthonormalBasis onb(isect.normal);
         Vec3 new_dir = onb.from_local(sampler.sample_cosine_hemisphere());
 
-        Ray new_ray(isect.point, new_dir);
         return ScatterEvent(
-            new_ray,
-            texture.value(isect.uv, isect.point),
+            Ray(isect.point, new_dir),
+            texture.value(isect.uv, isect.point, isect.lambdas),
             sampler.cosine_hemisphere_pdf(onb.u[0].dot(new_dir))
         );
     }
@@ -63,13 +70,12 @@ public:
     virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
         Vec3 new_dir = ray.d.reflect(isect.normal);
         if (roughness > 0.0f) {
-            new_dir += roughness * sampler.sample_uniform_sphere() * sampler.dist(sampler.rng);
+            new_dir += roughness * sampler.sample_uniform_sphere() * sampler.sample_1d();
         }
 
-        Ray new_ray(isect.point, new_dir);
         return ScatterEvent(
-            new_ray,
-            texture.value(isect.uv, isect.point)
+            Ray(isect.point, new_dir),
+            texture.value(isect.uv, isect.point, isect.lambdas)
         );
     }
 
@@ -97,16 +103,18 @@ public:
 
         float cos_theta = -normal.dot(ray.d);
         Vec3 new_dir;
-        if (reflectance(cos_theta, ior_ratio) > sampler.dist(sampler.rng)) {
+        if (reflectance(cos_theta, ior_ratio) > sampler.sample_1d()) {
             new_dir = ray.d.reflect(normal);
         }
         else {
             new_dir = ray.d.normalize().refract(normal, ior_ratio);
         }
 
-        return  ScatterEvent(
-            std::make_optional(Ray(isect.point, new_dir)),
-            texture.value(isect.uv, isect.point)
+        // TODO: update this to refract different wavelengths differently
+
+        return ScatterEvent(
+            Ray(isect.point, new_dir),
+            texture.value(isect.uv, isect.point, isect.lambdas)
         );
     }
 
@@ -131,13 +139,13 @@ public:
         if (isect.outer_face) {
             return ScatterEvent(
                 std::nullopt,
-                texture.value(isect.uv, isect.point)
+                texture.value(isect.uv, isect.point, isect.lambdas)
             );
         }
         else {
             return ScatterEvent(
                 std::nullopt,
-                Vec3(0.f, 0.f, 0.f)
+                SpectrumSample(0.0f)
             );
         }
     }
