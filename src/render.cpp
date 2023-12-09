@@ -9,7 +9,7 @@
 #include "render.hpp"
 
 // if defined, run in multithreaded mode, helpful to disable when debugging
-#define MULTITHREADED
+// #define MULTITHREADED
 // if defined, test for more than 1 intersection at a time
 // NOTE: I've currently only been able to get a packet size of 4 to work, though 8 should work hypothetically
 // #define PACKET_SIZE 4
@@ -51,12 +51,14 @@ SpectrumSample sample_pixel_inner(
     size_t bounces
 ) {
     if (bounces == 0) {
-        return SpectrumSample(0.0);
+        return SpectrumSample(1.0);
     }
     auto isect = scene.ray_intersect(r, wavelengths, sampler);
+    // no intersection, return background color
     if (!isect) {
         return SpectrumSample(0.0f);
     }
+    // intersection, but no new ray; stop here
     if (!isect->new_ray || isect->pdf == 0.f) {
         return isect->color;
     }
@@ -247,7 +249,7 @@ void render_pixels(
             std::array<WavelengthSample, PACKET_SIZE> wavelengths;
             for (size_t ss = 0; ss < PACKET_SIZE; ss++) {
                 sampler.start_pixel_sample(x, y, chunk * PACKET_SIZE + ss);
-                auto jitter = sampler.sample_pixel_2d();
+                auto jitter = sampler.sample_pixel();
                 float u = float(x) + jitter.x;
                 float v = float(y) + jitter.y;
                 rays[ss] = camera.cast_ray(u, v);
@@ -263,7 +265,7 @@ void render_pixels(
         }
         for (size_t s = 0; s < rem; s++) {
             sampler.start_pixel_sample(x, y, n_chunks * 4 + s);
-            auto jitter = sampler.sample_pixel_2d();
+            auto jitter = sampler.sample_pixel();
             float u = float(x) + jitter.x;
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);

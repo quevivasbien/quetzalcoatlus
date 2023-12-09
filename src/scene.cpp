@@ -325,9 +325,9 @@ unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* 
     return geom_id;
 }
 
-unsigned int Scene::add_obj(const std::string& filename, const Material* material) {
+unsigned int Scene::add_obj(const std::string& filename, const Material* material, const Transform& transform) {
     // for now, only supports triangle meshes
-    std::vector<Vec3> vertices;
+    std::vector<Pt3> vertices;
     std::vector<std::array<unsigned int, 3>> faces;
     // open file and read in vertices and faces
     std::ifstream file(filename);
@@ -347,9 +347,9 @@ unsigned int Scene::add_obj(const std::string& filename, const Material* materia
         }
         std::string first_word = line.substr(0, first_space);
         if (first_word == "v") {
-            Vec3 v;
+            Pt3 v;
             std::sscanf(line.c_str(), "v %f %f %f", &v.x, &v.y, &v.z);
-            vertices.push_back(v);
+            vertices.push_back(transform * v);
         }
         else if (first_word == "f") {
             std::array<unsigned int, 3> f;

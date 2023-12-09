@@ -28,15 +28,15 @@ public:
 
     Vec2 sample_uniform_disk();
     Vec3 sample_uniform_hemisphere();
-    float uniform_hemisphere_pdf() {
+    float uniform_hemisphere_pdf() const {
         return 0.5 * M_1_PI;
     }
     Vec3 sample_uniform_sphere();
-    float uniform_sphere_pdf() {
+    float uniform_sphere_pdf() const {
         return 0.25 * M_1_PI;
     }
     Vec3 sample_cosine_hemisphere();
-    float cosine_hemisphere_pdf(float cos_theta) {
+    float cosine_hemisphere_pdf(float cos_theta) const {
         return cos_theta * M_1_PI;
     }
 

@@ -30,5 +30,13 @@ public:
         return u[0] * v.x + u[1] * v.y + u[2] * v.z;
     }
 
+    Vec3 to_local(const Vec3& v) const {
+        return Vec3(
+            u[0].dot(v),
+            u[1].dot(v),
+            u[2].dot(v)
+        );
+    }
+
     Vec3 u[3];
 };

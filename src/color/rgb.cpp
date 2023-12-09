@@ -7,7 +7,7 @@
 #include "rgb.hpp"
 #include "spectra.hpp"
 
-const size_t SPECTRUM_TABLE_RES = 64;
+const size_t SPECTRUM_TABLE_RES = 32;
 
 RGBColorSpace::RGBColorSpace(
     Vec2 r, Vec2 g, Vec2 b,

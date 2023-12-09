@@ -1,4 +1,3 @@
-#include <bit>
 #include <cmath>
 #include <cstring>
 

@@ -25,6 +25,8 @@ public:
 
     void terminate_secondary();
 
+    float operator[](size_t i) const { return m_lambdas[i]; }
+
     bool operator==(const WavelengthSample& other) const;
 
     SampleArray m_lambdas;

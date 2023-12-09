@@ -1,5 +1,6 @@
 target_sources(lib
     PRIVATE
+        bxdf.cpp
         camera.cpp
         image.cpp
         random.cpp

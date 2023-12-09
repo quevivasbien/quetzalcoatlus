@@ -1,7 +1,7 @@
 #pragma once
 
+#include "bxdf.hpp"
 #include "color/color.hpp"
-#include "onb.hpp"
 #include "random.hpp"
 #include "ray.hpp"
 #include "material.hpp"
@@ -15,24 +15,14 @@ struct ShapeIntersection {
     Vec3 normal;
     Pt3 point;
     bool outer_face;
-    WavelengthSample lambdas;
-
-    ShapeIntersection(
-        Vec2 uv,
-        Vec3 normal,
-        Pt3 point,
-        bool outer_face,
-        const WavelengthSample& lambdas
-    ) : uv(uv), normal(normal), point(point), outer_face(outer_face), lambdas(lambdas) {}
+    WavelengthSample wavelengths;
 };
 
 
 struct ScatterEvent {
     std::optional<Ray> new_ray;
     SpectrumSample color;
-    float pdf;
-
-    ScatterEvent(std::optional<Ray>&& new_ray, SpectrumSample&& color, float pdf = 1.0f) : new_ray(std::move(new_ray)), color(std::move(color)), pdf(pdf) {}
+    float pdf = 1.0f;
 };
 
 
@@ -45,20 +35,29 @@ public:
 template <typename T>
 class LambertMaterial : public Material {
 public:
-    explicit LambertMaterial(T&& texture) : texture(texture) {}
+    explicit LambertMaterial(T&& texture) : m_texture(texture) {}
 
     virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
-        OrthonormalBasis onb(isect.normal);
-        Vec3 new_dir = onb.from_local(sampler.sample_cosine_hemisphere());
-
-        return ScatterEvent(
-            Ray(isect.point, new_dir),
-            texture.value(isect.uv, isect.point, isect.lambdas),
-            sampler.cosine_hemisphere_pdf(onb.u[0].dot(new_dir))
+        auto r = m_texture.value(isect.uv, isect.point, isect.wavelengths);
+        BSDF bsdf(
+            isect.normal,
+            std::make_unique<DiffuseBxDF>(std::move(r))
         );
+        auto sample = bsdf.sample(-ray.d, sampler);
+        if (!sample) {
+            return ScatterEvent {
+                .new_ray = std::nullopt,
+                .color = SpectrumSample(0.0f),
+            };
+        }
+        return ScatterEvent {
+            .new_ray = Ray(isect.point, sample->wi),
+            .color = sample->spec,
+            .pdf = sample->pdf
+        };
     }
 
-    T texture;
+    T m_texture;
 };
 
 
@@ -75,7 +74,7 @@ public:
 
         return ScatterEvent(
             Ray(isect.point, new_dir),
-            texture.value(isect.uv, isect.point, isect.lambdas)
+            texture.value(isect.uv, isect.point, isect.wavelengths)
         );
     }
 
@@ -114,7 +113,7 @@ public:
 
         return ScatterEvent(
             Ray(isect.point, new_dir),
-            texture.value(isect.uv, isect.point, isect.lambdas)
+            texture.value(isect.uv, isect.point, isect.wavelengths)
         );
     }
 
@@ -139,7 +138,7 @@ public:
         if (isect.outer_face) {
             return ScatterEvent(
                 std::nullopt,
-                texture.value(isect.uv, isect.point, isect.lambdas)
+                texture.value(isect.uv, isect.point, isect.wavelengths)
             );
         }
         else {
