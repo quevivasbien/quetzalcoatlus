@@ -1,4 +1,8 @@
+#include <algorithm>
+
 #include "sensor.hpp"
+
+const float SENSOR_SATURATION = 10.0f;
 
 const Mat3 LMS_FROM_XYZ = Mat3({
     0.8951,  0.2664, -0.1614,
@@ -51,12 +55,18 @@ PixelSensor::PixelSensor(
 }
 
 RGB PixelSensor::to_sensor_rgb(const SpectrumSample& sample, const WavelengthSample& wavelengths) const {
-    auto l = sample / SpectrumSample::from_wavelengths(wavelengths);
-    return RGB(
+    auto l = sample / SpectrumSample::from_wavelengths_pdf(wavelengths);
+    RGB rgb(
         (SpectrumSample::from_spectrum(m_r, wavelengths) * l).average() * m_imaging_ratio,
         (SpectrumSample::from_spectrum(m_g, wavelengths) * l).average() * m_imaging_ratio,
         (SpectrumSample::from_spectrum(m_b, wavelengths) * l).average() * m_imaging_ratio
     );
+    // clamp total contribution to avoid super bright speckles
+    float m = std::max({rgb.x, rgb.y, rgb.z});
+    if (m > SENSOR_SATURATION) {
+        rgb *= SENSOR_SATURATION / m;
+    }
+    return rgb;
 }
 
 PixelSensor PixelSensor::CIE_XYZ(float imaging_ratio) {

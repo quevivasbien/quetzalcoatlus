@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <array>
-#include <cassert>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -47,7 +46,7 @@ struct PixelSample {
 PixelSample sample_pixel(
     Ray ray,
     const Scene& scene,
-    const WavelengthSample& wavelengths,
+    WavelengthSample& wavelengths,
     Sampler& sampler,
     size_t max_bounces
 ) {
@@ -80,12 +79,8 @@ PixelSample sample_pixel(
         if (!bsdf_sample) {
             break;
         }
-        for (size_t i = 0; i < N_SPECTRUM_SAMPLES; i++) {
-            assert(!std::isnan(bsdf_sample->spec[i]));
-        }
-        assert(bsdf_sample->pdf != 0.0f);
         if (depth == 0) {
-            sample.albedo = bsdf_sample->spec;
+            sample.albedo = sample.color + bsdf_sample->spec;
         }
         weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(isect->normal)) / bsdf_sample->pdf;
         ray = Ray(isect->point, bsdf_sample->wi);

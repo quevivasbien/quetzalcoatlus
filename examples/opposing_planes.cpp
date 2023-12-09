@@ -8,30 +8,36 @@
 int main() {
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(
+    SimpleLight light(
         std::make_shared<RGBIlluminantSpectrum>(RGB(2.6, 0.8, 1.2))
-    ));
+    );
     scene.add_plane(
         Pt3(0., 0., 5.),
         Vec3(-1., 0., -1.).normalize(),
-        &light
+        nullptr, &light
     );
 
-    SpecularMaterial right_plane(SolidColor(221. / 255., 15. / 255., 110. / 255.), 0.1);
+    ConductiveMaterial right_plane(
+        std::make_shared<ConstantSpectrum>(1.2),
+        std::make_shared<RGBUnboundedSpectrum>(RGB(221. / 255., 15. / 255., 110. / 255.))
+    );
     scene.add_plane(
         Pt3(0., 0., -10.),
         Vec3(-0.5, 0.5, 1.).normalize(),
         &right_plane
     );
 
-    SpecularMaterial left_plane(SolidColor(19. / 255., 70. / 255., 180. / 255.), 0.1);
+    ConductiveMaterial left_plane(
+        std::make_shared<ConstantSpectrum>(1.2),
+        std::make_shared<RGBUnboundedSpectrum>(RGB(19. / 255., 70. / 255., 180. / 255.))
+    );
     scene.add_plane(
         Pt3(0., 0., -10.),
         Vec3(0.5, -0.5, 1.).normalize(),
         &left_plane
     );
 
-    RefractiveMaterial sphere(SolidColor(1.0, 1.0, 1.0), 1.2);
+    DielectricMaterial sphere(1.2);
     scene.add_sphere(
         Pt3(1., 1., -5.), 0.8,
         &sphere

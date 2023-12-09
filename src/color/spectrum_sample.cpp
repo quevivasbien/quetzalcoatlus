@@ -200,6 +200,6 @@ float SpectrumSample::average() const {
 
 
 // construct new spectrum from wavelengths pdf
-SpectrumSample SpectrumSample::from_wavelengths(const WavelengthSample& wavelengths) {
+SpectrumSample SpectrumSample::from_wavelengths_pdf(const WavelengthSample& wavelengths) {
     return SpectrumSample(wavelengths.m_pdf);
 }

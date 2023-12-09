@@ -59,7 +59,7 @@ float sigmoid(float x) {
     if (std::isinf(x)) {
         return x > 0.0f ? 1.0f : 0.0f;
     }
-    return 0.5f + x / (2.0f * std::sqrt(1.0f + x * x));
+    return 0.5f + 0.5f *x / (std::sqrt(1.0f + x * x));
 }
 
 float RGBSigmoidPolynomial::operator()(float lambda) const {
@@ -83,7 +83,7 @@ RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB& rgb) const {
     if (rgb.r() == rgb.g() && rgb.g() == rgb.b()) {
         // returns a constant spectrum
         return RGBSigmoidPolynomial(
-            0.0f, 0.0f, (rgb.r() - 0.5f) / std::sqrt(rgb.r() * (1.0f - rgb.r()))
+            0.0f, 0.0f, (rgb.r() - 0.5f) / std::sqrt(std::max(0.0f, rgb.r() * (1.0f - rgb.r())))
         );
     }
 

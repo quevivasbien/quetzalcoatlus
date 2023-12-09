@@ -25,7 +25,7 @@ Vec2 Sampler::sample_uniform_disk() {
 Vec3 Sampler::sample_uniform_hemisphere() {
     Vec2 uv = sample_2d();
     float z = uv.x;
-    float r = sqrtf(1.0f - z * z);
+    float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
     float phi = 2.0f * M_PI * uv.y;
     return Vec3(
         r * cosf(phi),
@@ -38,7 +38,7 @@ Vec3 Sampler::sample_uniform_sphere() {
     Vec2 uv = sample_2d();
 
     float z = 1.0f - 2.0f * uv.x;
-    float r = sqrtf(1.0f - z * z);
+    float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
     float phi = 2.0f * M_PI * uv.y;
 
     return Vec3(r * cosf(phi), r * sinf(phi), z);
@@ -48,7 +48,7 @@ Vec3 Sampler::sample_cosine_hemisphere() {
     // sample from unit disk
     Vec2 d = sample_uniform_disk();
     // project up to a hemisphere
-    float z = fsqrt(1.0f - d.x * d.x - d.y * d.y);
+    float z = std::sqrt(std::max(0.0f, 1.0f - d.x * d.x - d.y * d.y));
     return Vec3(d.x, d.y, z);
 }
 

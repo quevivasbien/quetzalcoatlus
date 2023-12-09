@@ -11,17 +11,23 @@
 int main() {
     Scene scene(initialize_device());
 
-    auto light_color = SolidColor(
-        std::make_shared<RGBIlluminantSpectrum>(RGB(8.0f, 8.0f, 8.0f))
-    );
-    EmissiveMaterial light{ light_color };
+    auto light_spectrum = 
+        std::make_shared<RGBIlluminantSpectrum>(RGB(6.0, 3.0, 3.0));
+    SimpleLight light(light_spectrum);
     scene.add_quad(
         Pt3(-1.f, 1.9999f, -6.f),
         Pt3(1.f, 1.9999f, -6.f),
         Pt3(1.f, 1.9999f, -4.f),
         Pt3(-1.f, 1.9999f, -4.f),
-        &light
+        nullptr, &light
     );
+
+    // scene.add_plane(
+    //     Pt3(0., 0., 10.),
+    //     Vec3(0., 0., -1.),
+    //     nullptr, &light
+    // );
+
     DiffuseMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, 2.f, -7.f),
@@ -62,15 +68,15 @@ int main() {
         Pt3(-2.f, 2.f, -7.f),
         &back_wall
     );
-    RefractiveMaterial refractive_sphere(SolidColor(0.9f, 0.9f, 0.9f), 1.4f);
+    DielectricMaterial dielectric(std::make_shared<RGBUnboundedSpectrum>(RGB(0.8f, 1.2f, 1.8f)));
     scene.add_sphere(
         Pt3(-0.8f, -1.25f, -4.4f), 0.75f,
-        &refractive_sphere
+        &dielectric
     );
-    SpecularMaterial specular_sphere(SolidColor(0.96, 0.9, 1.0), 0.05);
+    ConductiveMaterial conductor(2.0, 2.0);
     scene.add_sphere(
         Pt3(0.6f, -1.0f, -5.5f), 1.0f,
-        &specular_sphere
+        &conductor
     );
     
     scene.commit();
@@ -78,8 +84,8 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 36;
-    size_t max_bounces = 32;
+    size_t n_samples = 16;
+    size_t max_bounces = 64;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
         n_samples << " samples and " << max_bounces << " bounces" << std::endl;

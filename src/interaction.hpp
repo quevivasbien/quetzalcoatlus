@@ -22,7 +22,7 @@ struct SurfaceInteraction : public Interaction {
         const Light* light
     ) : Interaction { point, wo, normal, uv }, material(material), light(light) {}
 
-    std::optional<BSDF> bsdf(const Ray& ray, const WavelengthSample& wavelengths, Sampler& sampler) const {
+    std::optional<BSDF> bsdf(const Ray& ray, WavelengthSample& wavelengths, Sampler& sampler) const {
         if (!material) {
             return std::nullopt;
         }

@@ -18,6 +18,17 @@ public:
 };
 
 
+class ConstantSpectrum : public Spectrum {
+public:
+    explicit ConstantSpectrum(float value) : m_value(value) {}
+    float operator()(float lambda) const override {
+        return m_value;
+    }
+
+    float m_value;
+};
+
+
 class DenselySampledSpectrum : public Spectrum {
 public:
     explicit DenselySampledSpectrum(

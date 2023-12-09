@@ -247,10 +247,10 @@ std::optional<BSDFSample> DielectricBxDF::sample(Vec3 wo, Sampler& sampler) cons
             return std::nullopt;
         }
         auto [wi, ior_p] = refr.value();
-        SpectrumSample spec_r(t / abs_cos_theta(wi));
+        SpectrumSample spec_t(t / abs_cos_theta(wi));
         // TODO: account for difference between radiance and importance
         return BSDFSample {
-            .spec = spec_r,
+            .spec = spec_t,
             .wi = wi,
             .pdf = t / (r + t)
         };

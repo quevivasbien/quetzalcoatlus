@@ -36,13 +36,13 @@ int main(int argc, const char* const argv[]) {
 
     Scene scene(initialize_device());
 
-    DirectionalLight light(std::make_shared<RGBIlluminantSpectrum>(RGB(1., 0.4, 1.)));
+    DirectionalLight light(spectra::ILLUM_D65());
     scene.add_plane(
         Pt3(0., 100., 100.),
         Vec3(0., -1., -1.).normalize(),
         nullptr, &light, 200
     );
-    DiffuseMaterial material(SolidColor(0.8, 0.2, 0.3));
+    DiffuseMaterial material(SolidColor(0.8, 0.4, 0.8));
     scene.add_obj(filename, &material);
     scene.commit();
 
@@ -52,7 +52,7 @@ int main(int argc, const char* const argv[]) {
         * Transform::rotate_y(camera_rotation.y)
         * Transform::rotate_z(camera_rotation.z);
     Camera camera(
-        1920 / 4, 1080 / 4, M_PI / 3.0,
+        1920, 1080, M_PI / 3.0,
         camera_t
     );
     size_t n_samples = 16;

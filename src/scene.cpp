@@ -31,7 +31,7 @@ Vec2 get_sphere_uv(const Vec3& n) {
     if (u >= 1.0f) {
         u -= __FLT_EPSILON__;
     }
-    float theta = acosf(n.y);
+    float theta = std::acos(n.y);
     float v = theta / M_PI;
     if (v >= 1.0f) {
         v -= __FLT_EPSILON__;

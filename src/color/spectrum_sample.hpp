@@ -93,7 +93,7 @@ public:
     }
 
     // construct new spectrum from wavelengths pdf
-    static SpectrumSample from_wavelengths(const WavelengthSample& wavelengths);
+    static SpectrumSample from_wavelengths_pdf(const WavelengthSample& wavelengths);
 
     SampleArray m_values;
 };

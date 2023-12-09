@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 
 #include "vec.hpp"
@@ -77,7 +78,7 @@ Vec3& Vec3::operator/=(float t) {
 
 // linalg operations
 float Vec3::norm() const {
-    return sqrt(x * x + y * y + z * z);
+    return std::sqrt(x * x + y * y + z * z);
 }
 float Vec3::norm_squared() const {
     return x * x + y * y + z * z;
@@ -116,13 +117,13 @@ Vec3 Vec3::reflect(const Vec3 &normal) const {
 
 // NOTE: assumes that this and normal are both unit vectors!
 Vec3 Vec3::refract(const Vec3 &normal, float ior_ratio) const {
-    float cos_theta = fminf(-normal.dot(*this), 1.);
-    float sin_theta = sqrtf(1. - cos_theta * cos_theta);
+    float cos_theta = std::min(-normal.dot(*this), 1.0f);
+    float sin_theta = std::sqrt(1.0f - cos_theta * cos_theta);
     if (ior_ratio * sin_theta > 1.0f) {
         return reflect(normal);
     }
     Vec3 r_out_perp = ior_ratio * (cos_theta * normal + *this);
-    Vec3 r_out_parallel = -sqrtf(fabsf(1. - r_out_perp.norm_squared())) * normal;
+    Vec3 r_out_parallel = -std::sqrt(std::abs(1.0f - r_out_perp.norm_squared())) * normal;
     
     return r_out_perp + r_out_parallel;
 }
