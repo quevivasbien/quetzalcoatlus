@@ -10,18 +10,14 @@
 #include <embree4/rtcore.h>
 
 #include "color/color.hpp"
+#include "interaction.hpp"
+#include "light.hpp"
 #include "material.hpp"
 #include "random.hpp"
 #include "ray.hpp"
 #include "vec.hpp"
 
 RTCDevice initialize_device();
-
-struct SceneIntersection : ScatterEvent {
-    Vec3 normal;
-
-    SceneIntersection(ScatterEvent&& se, Vec3 normal) : ScatterEvent(std::move(se)), normal(normal) {}
-};
 
 enum Shape {
     SPHERE,
@@ -33,6 +29,7 @@ enum Shape {
 struct GeometryData {
     Shape shape;
     const Material* material;
+    const Light* light;
 };
 
 class Scene {
@@ -48,32 +45,32 @@ public:
     bool ready() const { return m_ready; }
 
     // intersect a single ray with the scene
-    std::optional<SceneIntersection> ray_intersect(const Ray& ray, const WavelengthSample& wavelengths, Sampler& sampler) const;
-    // intersect a packet of 4 rays with the scene
-    std::array<std::optional<SceneIntersection>, 4> ray_intersect(
-        const std::array<Ray, 4>& rays,
-        const std::array<WavelengthSample, 4>& wavelengths,
-        Sampler& sampler,
-        const std::array<int, 4>& valid = { -1, -1, -1, -1 }
-    ) const;
-    // intersect a packet of 8 rays with the scene
-    std::array<std::optional<SceneIntersection>, 8> ray_intersect(
-        const std::array<Ray, 8>& rays,
-        const std::array<WavelengthSample, 8>& wavelengths,
-        Sampler& sampler,
-        const std::array<int, 8>& valid = { -1, -1, -1, -1, -1, -1, -1, -1 }
-    ) const;
+    std::optional<SurfaceInteraction> ray_intersect(const Ray& ray, const WavelengthSample& wavelengths, Sampler& sampler) const;
+    // // intersect a packet of 4 rays with the scene
+    // std::array<std::optional<SurfaceInteraction>, 4> ray_intersect(
+    //     const std::array<Ray, 4>& rays,
+    //     const std::array<WavelengthSample, 4>& wavelengths,
+    //     Sampler& sampler,
+    //     const std::array<int, 4>& valid = { -1, -1, -1, -1 }
+    // ) const;
+    // // intersect a packet of 8 rays with the scene
+    // std::array<std::optional<SurfaceInteraction>, 8> ray_intersect(
+    //     const std::array<Ray, 8>& rays,
+    //     const std::array<WavelengthSample, 8>& wavelengths,
+    //     Sampler& sampler,
+    //     const std::array<int, 8>& valid = { -1, -1, -1, -1, -1, -1, -1, -1 }
+    // ) const;
 
     // methods for adding shapes to scene; return geometry ID
     // in cases where multiple points are required, they should be given in clockwise order around the outward face
 
-    unsigned int add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material);
-    unsigned int add_sphere(const Pt3& center, float radius, const Material* material);
-    unsigned int add_quad(const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d, const Material* material);
+    unsigned int add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material, const Light* light = nullptr);
+    unsigned int add_sphere(const Pt3& center, float radius, const Material* material, const Light* light = nullptr);
+    unsigned int add_quad(const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d, const Material* material, const Light* light = nullptr);
     // plane is just a large square quad centered around the given point
-    unsigned int add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
+    unsigned int add_plane(const Pt3& p, const Vec3& n, const Material* material, const Light* light = nullptr, float half_size = 1000.0f);
 
-    unsigned int add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
+    unsigned int add_obj(const std::string& filename, const Material* material, const Light* light = nullptr, const Transform& transform = Transform::identity());
 
     std::optional<const GeometryData*> get_geom_data(unsigned int geom_id) const {
         const void* ptr = rtcGetGeometryUserDataFromScene(m_scene, geom_id);

@@ -36,13 +36,13 @@ int main(int argc, const char* const argv[]) {
 
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(spectra::ILLUM_D65()));
+    DirectionalLight light(std::make_shared<RGBIlluminantSpectrum>(RGB(1., 0.4, 1.)));
     scene.add_plane(
         Pt3(0., 100., 100.),
         Vec3(0., -1., -1.).normalize(),
-        &light
+        nullptr, &light, 200
     );
-    LambertMaterial material(SolidColor(0.9, 0.7, 0.8));
+    DiffuseMaterial material(SolidColor(0.8, 0.2, 0.3));
     scene.add_obj(filename, &material);
     scene.commit();
 
@@ -52,7 +52,7 @@ int main(int argc, const char* const argv[]) {
         * Transform::rotate_y(camera_rotation.y)
         * Transform::rotate_z(camera_rotation.z);
     Camera camera(
-        1920, 1080, M_PI / 3.0,
+        1920 / 4, 1080 / 4, M_PI / 3.0,
         camera_t
     );
     size_t n_samples = 16;
@@ -65,6 +65,7 @@ int main(int argc, const char* const argv[]) {
 
     result.save_albedo(filename_base + "_albedo.png");
     result.save_normal(filename_base + "_normal.png");
+    result.save(filename_base + "_no_denoise.png");
 
     result.denoise();
     result.save(filename_base + ".png");

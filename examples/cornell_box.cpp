@@ -22,7 +22,7 @@ int main() {
         Pt3(-1.f, 1.9999f, -4.f),
         &light
     );
-    LambertMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
+    DiffuseMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, 2.f, -7.f),
         Pt3(2.f, 2.f, -7.f),
@@ -30,7 +30,7 @@ int main() {
         Pt3(-2.f, 2.f, -3.f),
         &ceiling
     );
-    LambertMaterial floor(SolidColor(0.1f, 0.6f, 0.8f));
+    DiffuseMaterial floor(SolidColor(0.1f, 0.6f, 0.8f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -3.f),
         Pt3(2.f, -2.f, -3.f),
@@ -38,7 +38,7 @@ int main() {
         Pt3(-2.f, -2.f, -7.f),
         &floor
     );
-    LambertMaterial left_wall(SolidColor(0.8f, 0.0f, 0.1f));
+    DiffuseMaterial left_wall(SolidColor(0.8f, 0.0f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -3.f),
         Pt3(-2.f, -2.f, -7.f),
@@ -46,7 +46,7 @@ int main() {
         Pt3(-2.f, 2.f, -3.f),
         &left_wall
     );
-    LambertMaterial right_wall(SolidColor(0.1f, 0.1f, 0.8f));
+    DiffuseMaterial right_wall(SolidColor(0.1f, 0.1f, 0.8f));
     scene.add_quad(
         Pt3(2.f, -2.f, -3.f),
         Pt3(2.f, 2.f, -3.f),
@@ -54,7 +54,7 @@ int main() {
         Pt3(2.f, -2.f, -7.f),
         &right_wall
     );
-    LambertMaterial back_wall(SolidColor(0.1f, 0.8f, 0.1f));
+    DiffuseMaterial back_wall(SolidColor(0.1f, 0.8f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -7.f),
         Pt3(2.f, -2.f, -7.f),

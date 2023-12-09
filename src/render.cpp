@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -9,7 +10,7 @@
 #include "render.hpp"
 
 // if defined, run in multithreaded mode, helpful to disable when debugging
-// #define MULTITHREADED
+#define MULTITHREADED
 // if defined, test for more than 1 intersection at a time
 // NOTE: I've currently only been able to get a packet size of 4 to work, though 8 should work hypothetically
 // #define PACKET_SIZE 4
@@ -43,184 +44,235 @@ struct PixelSample {
     }
 };
 
-SpectrumSample sample_pixel_inner(
-    const Ray& r,
-    const Scene& scene,
-    const WavelengthSample& wavelengths,
-    Sampler& sampler,
-    size_t bounces
-) {
-    if (bounces == 0) {
-        return SpectrumSample(1.0);
-    }
-    auto isect = scene.ray_intersect(r, wavelengths, sampler);
-    // no intersection, return background color
-    if (!isect) {
-        return SpectrumSample(0.0f);
-    }
-    // intersection, but no new ray; stop here
-    if (!isect->new_ray || isect->pdf == 0.f) {
-        return isect->color;
-    }
-    
-    return (
-        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, wavelengths, sampler, bounces-1)
-    ) / isect->pdf;
-}
-
 PixelSample sample_pixel(
-    const Ray& r,
+    Ray ray,
     const Scene& scene,
     const WavelengthSample& wavelengths,
     Sampler& sampler,
-    size_t bounces
+    size_t max_bounces
 ) {
-    auto isect = scene.ray_intersect(r, wavelengths, sampler);
-    if (!isect) {
-        return PixelSample();
-    }
-    PixelSample pixel_sample(isect->normal, isect->color);
-    if (!isect->new_ray || isect->pdf == 0.f) {
-        pixel_sample.color = isect->color;
-        return pixel_sample;
-    }
-
-    pixel_sample.color = (
-        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, wavelengths, sampler, bounces-1)
-    ) / isect->pdf;
-
-    return pixel_sample;
-}
-
-template <size_t N>
-std::array<SpectrumSample, N> sample_pixel_inner(
-    const std::array<Ray, N>& rays,
-    const std::array<int, N>& valid,
-    const Scene& scene,
-    const std::array<WavelengthSample, N>& wavelengths,
-    Sampler& sampler,
-    size_t bounces
-) {
-    std::array<SpectrumSample, N> samples {};
-    if (bounces == 0) {
-        return samples;
-    }
-    auto isects = scene.ray_intersect(rays, wavelengths, sampler, valid);
-    std::array<Ray, N> new_rays;
-    std::array<int, N> new_valid{};
-    for (size_t i = 0; i < N; i++) {
-        if (valid[i] == 0 || !isects[i]) {
-            continue;
-        }
-        if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
-            samples[i] = isects[i]->color;
-            continue;
-        }
-        new_rays[i] = *isects[i]->new_ray;
-        new_valid[i] = -1;
-    }
-    
-    int n_valid = std::accumulate(new_valid.begin(), new_valid.end(), 0);
-    if (n_valid == 0) {
-        return samples;
-    }
-
-    std::array<SpectrumSample, N> inner_samples;
-    // there's just one active ray left, switch to single sampling, otherwise recurse deeper
-    if (n_valid == -1) {
-        for (size_t i = 0; i < N; i++) {
-            if (valid[i] == 0) {
-                inner_samples[i] = SpectrumSample(0.0f);
-            }
-            else {
-                inner_samples[i] = sample_pixel_inner(
-                    rays[i],
-                    scene,
-                    wavelengths[i],
-                    sampler,
-                    bounces-1
-                );
-            }
-        }
-    }
-    else {
-        inner_samples = sample_pixel_inner(
-            new_rays, new_valid,
-            scene,
-            wavelengths,
-            sampler,
-            bounces-1
-        );
-    }
-
-    for (size_t i = 0; i < N; i++) {
-        if (new_valid[i] == 0) {
-            continue;
-        }
-        samples[i] = (
-            isects[i]->color * isects[i]->pdf * inner_samples[i]
-        ) / isects[i]->pdf;
-    }
-    return samples;
-}
-
-template <size_t N>
-std::array<PixelSample, N> sample_pixel(
-    const std::array<Ray, N>& rays,
-    const Scene& scene,
-    const std::array<WavelengthSample, N>& wavelengths,
-    Sampler& sampler,
-    size_t bounces
-) {
-    std::array<PixelSample, N> samples{};
-    // valid = -1 means we want to continue tracing this ray
-    // valid = 0 means we want to stop tracing this ray
-    // this is just based on embree syntax for rtcIntersect4/8/16
-    std::array<Ray, N> new_rays;
-    std::array<int, N> valid{};
-    auto isects = scene.ray_intersect(rays, wavelengths, sampler);
-    for (size_t i = 0; i < N; i++) {
-        if (!isects[i]) {
-            continue;
-        }
-        samples[i].normal = isects[i]->normal;
-        samples[i].albedo = isects[i]->color;
-        if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
-            samples[i].color = isects[i]->color;
-            continue;
-        }
-        new_rays[i] = *isects[i]->new_ray;
-        valid[i] = -1;
-    }
-    bool exit = true;
-    for (size_t i = 0; i < N; i++) {
-        if (valid[i] != 0) {
-            exit = false;
+    PixelSample sample{};
+    SpectrumSample weight(1.0f);
+    size_t depth = 0;
+    while (!weight.is_zero()) {
+        auto isect = scene.ray_intersect(ray, wavelengths, sampler);
+        // no intersection, add background and break
+        // TODO: add background / infinite lights
+        if (!isect) {
             break;
         }
-    }
-    if (exit) {
-        return samples;
-    }
-    
-    auto inner_samples = sample_pixel_inner(
-        new_rays, valid,
-        scene,
-        wavelengths,
-        sampler,
-        bounces-1
-    );
-    for (size_t i = 0; i < N; i++) {
-        if (valid[i] == 0) {
+        if (depth == 0) {
+            sample.normal = isect->normal;
+        }
+        // TODO: change this when specular bounce and light sampling is implemented
+        sample.color += weight * isect->emission(-ray.d, wavelengths);
+        if (depth == max_bounces) {
+            break;
+        }
+        auto bsdf = isect->bsdf(ray, wavelengths, sampler);
+        if (!bsdf) {
+            ray = isect->skip_intersection(ray);
             continue;
         }
-        samples[i].color = (
-            isects[i]->color * isects[i]->pdf * inner_samples[i]
-        ) / isects[i]->pdf;
+        // TODO: add light sampling
+
+        auto bsdf_sample = bsdf->sample(isect->wo, sampler);
+        if (!bsdf_sample) {
+            break;
+        }
+        for (size_t i = 0; i < N_SPECTRUM_SAMPLES; i++) {
+            assert(!std::isnan(bsdf_sample->spec[i]));
+        }
+        assert(bsdf_sample->pdf != 0.0f);
+        if (depth == 0) {
+            sample.albedo = bsdf_sample->spec;
+        }
+        weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(isect->normal)) / bsdf_sample->pdf;
+        ray = Ray(isect->point, bsdf_sample->wi);
+        depth++;
     }
 
-    return samples;
+    return sample;
 }
+
+// SpectrumSample sample_pixel_inner(
+//     const Ray& r,
+//     const Scene& scene,
+//     const WavelengthSample& wavelengths,
+//     Sampler& sampler,
+//     size_t bounces
+// ) {
+//     if (bounces == 0) {
+//         return SpectrumSample(1.0);
+//     }
+//     auto isect = scene.ray_intersect(r, wavelengths, sampler);
+//     // no intersection, return background color
+//     if (!isect) {
+//         return SpectrumSample(0.0f);
+//     }
+//     // intersection, but no new ray; stop here
+//     if (!isect->new_ray || isect->pdf == 0.f) {
+//         return isect->color;
+//     }
+    
+//     return (
+//         isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, wavelengths, sampler, bounces-1)
+//     ) / isect->pdf;
+// }
+
+// PixelSample sample_pixel(
+//     const Ray& r,
+//     const Scene& scene,
+//     const WavelengthSample& wavelengths,
+//     Sampler& sampler,
+//     size_t bounces
+// ) {
+//     auto isect = scene.ray_intersect(r, wavelengths, sampler);
+//     if (!isect) {
+//         return PixelSample();
+//     }
+//     PixelSample pixel_sample(isect->normal, isect->color);
+//     if (!isect->new_ray || isect->pdf == 0.f) {
+//         pixel_sample.color = isect->color;
+//         return pixel_sample;
+//     }
+
+//     pixel_sample.color = (
+//         isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, wavelengths, sampler, bounces-1)
+//     ) / isect->pdf;
+
+//     return pixel_sample;
+// }
+
+// template <size_t N>
+// std::array<SpectrumSample, N> sample_pixel_inner(
+//     const std::array<Ray, N>& rays,
+//     const std::array<int, N>& valid,
+//     const Scene& scene,
+//     const std::array<WavelengthSample, N>& wavelengths,
+//     Sampler& sampler,
+//     size_t bounces
+// ) {
+//     std::array<SpectrumSample, N> samples {};
+//     if (bounces == 0) {
+//         return samples;
+//     }
+//     auto isects = scene.ray_intersect(rays, wavelengths, sampler, valid);
+//     std::array<Ray, N> new_rays;
+//     std::array<int, N> new_valid{};
+//     for (size_t i = 0; i < N; i++) {
+//         if (valid[i] == 0 || !isects[i]) {
+//             continue;
+//         }
+//         if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
+//             samples[i] = isects[i]->color;
+//             continue;
+//         }
+//         new_rays[i] = *isects[i]->new_ray;
+//         new_valid[i] = -1;
+//     }
+    
+//     int n_valid = std::accumulate(new_valid.begin(), new_valid.end(), 0);
+//     if (n_valid == 0) {
+//         return samples;
+//     }
+
+//     std::array<SpectrumSample, N> inner_samples;
+//     // there's just one active ray left, switch to single sampling, otherwise recurse deeper
+//     if (n_valid == -1) {
+//         for (size_t i = 0; i < N; i++) {
+//             if (valid[i] == 0) {
+//                 inner_samples[i] = SpectrumSample(0.0f);
+//             }
+//             else {
+//                 inner_samples[i] = sample_pixel_inner(
+//                     rays[i],
+//                     scene,
+//                     wavelengths[i],
+//                     sampler,
+//                     bounces-1
+//                 );
+//             }
+//         }
+//     }
+//     else {
+//         inner_samples = sample_pixel_inner(
+//             new_rays, new_valid,
+//             scene,
+//             wavelengths,
+//             sampler,
+//             bounces-1
+//         );
+//     }
+
+//     for (size_t i = 0; i < N; i++) {
+//         if (new_valid[i] == 0) {
+//             continue;
+//         }
+//         samples[i] = (
+//             isects[i]->color * isects[i]->pdf * inner_samples[i]
+//         ) / isects[i]->pdf;
+//     }
+//     return samples;
+// }
+
+// template <size_t N>
+// std::array<PixelSample, N> sample_pixel(
+//     const std::array<Ray, N>& rays,
+//     const Scene& scene,
+//     const std::array<WavelengthSample, N>& wavelengths,
+//     Sampler& sampler,
+//     size_t bounces
+// ) {
+//     std::array<PixelSample, N> samples{};
+//     // valid = -1 means we want to continue tracing this ray
+//     // valid = 0 means we want to stop tracing this ray
+//     // this is just based on embree syntax for rtcIntersect4/8/16
+//     std::array<Ray, N> new_rays;
+//     std::array<int, N> valid{};
+//     auto isects = scene.ray_intersect(rays, wavelengths, sampler);
+//     for (size_t i = 0; i < N; i++) {
+//         if (!isects[i]) {
+//             continue;
+//         }
+//         samples[i].normal = isects[i]->normal;
+//         samples[i].albedo = isects[i]->color;
+//         if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
+//             samples[i].color = isects[i]->color;
+//             continue;
+//         }
+//         new_rays[i] = *isects[i]->new_ray;
+//         valid[i] = -1;
+//     }
+//     bool exit = true;
+//     for (size_t i = 0; i < N; i++) {
+//         if (valid[i] != 0) {
+//             exit = false;
+//             break;
+//         }
+//     }
+//     if (exit) {
+//         return samples;
+//     }
+    
+//     auto inner_samples = sample_pixel_inner(
+//         new_rays, valid,
+//         scene,
+//         wavelengths,
+//         sampler,
+//         bounces-1
+//     );
+//     for (size_t i = 0; i < N; i++) {
+//         if (valid[i] == 0) {
+//             continue;
+//         }
+//         samples[i].color = (
+//             isects[i]->color * isects[i]->pdf * inner_samples[i]
+//         ) / isects[i]->pdf;
+//     }
+
+//     return samples;
+// }
 
 void render_pixels(
     const Camera& camera,
@@ -351,9 +403,9 @@ RenderResult render(
     }
     #endif
     
-    std::vector<std::thread> threads;
     size_t image_size = result.width * result.height;
     #ifdef MULTITHREADED
+    std::vector<std::thread> threads;
     size_t n_threads = std::clamp<size_t>(
         std::thread::hardware_concurrency(),
         1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE

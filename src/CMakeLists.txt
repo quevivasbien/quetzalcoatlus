@@ -3,6 +3,8 @@ target_sources(lib
         bxdf.cpp
         camera.cpp
         image.cpp
+        material.cpp
+        light.cpp
         random.cpp
         render.cpp
         scene.cpp
