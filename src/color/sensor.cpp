@@ -2,7 +2,7 @@
 
 #include "sensor.hpp"
 
-const float SENSOR_SATURATION = 10.0f;
+const float SENSOR_SATURATION = 40.0f;
 
 const Mat3 LMS_FROM_XYZ = Mat3({
     0.8951,  0.2664, -0.1614,

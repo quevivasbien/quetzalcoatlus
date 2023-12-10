@@ -22,12 +22,6 @@ int main() {
         nullptr, &light
     );
 
-    // scene.add_plane(
-    //     Pt3(0., 0., 10.),
-    //     Vec3(0., 0., -1.),
-    //     nullptr, &light
-    // );
-
     DiffuseMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, 2.f, -7.f),
@@ -73,7 +67,10 @@ int main() {
         Pt3(-0.8f, -1.25f, -4.4f), 0.75f,
         &dielectric
     );
-    ConductiveMaterial conductor(2.0, 2.0);
+    ConductiveMaterial conductor(
+        std::make_shared<RGBUnboundedSpectrum>(RGB(0.8f, 1.2f, 1.8f)),
+        std::make_shared<RGBUnboundedSpectrum>(RGB(1.0f, 4.0f, 6.0f))
+    );
     scene.add_sphere(
         Pt3(0.6f, -1.0f, -5.5f), 1.0f,
         &conductor
@@ -84,7 +81,7 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 16;
+    size_t n_samples = 64;
     size_t max_bounces = 64;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<

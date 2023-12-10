@@ -11,7 +11,7 @@ Vec2 Sampler::sample_uniform_disk() {
         return Vec2(0.0f, 0.0f);
     }
     float theta, r;
-    if (fabsf(offset.x) > fabsf(offset.y)) {
+    if (std::abs(offset.x) > std::abs(offset.y)) {
         r = offset.x;
         theta = M_PI_4 * (offset.y / offset.x);
     }
@@ -19,7 +19,7 @@ Vec2 Sampler::sample_uniform_disk() {
         r = offset.y;
         theta = M_PI_2 - M_PI_4 * (offset.x / offset.y);
     }
-    return Vec2(r * cosf(theta), r * sinf(theta));
+    return Vec2(r * std::cos(theta), r * std::sin(theta));
 }
 
 Vec3 Sampler::sample_uniform_hemisphere() {
