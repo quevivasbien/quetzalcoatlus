@@ -36,14 +36,28 @@ int main(int argc, const char* const argv[]) {
 
     Scene scene(initialize_device());
 
-    DirectionalLight light(spectra::ILLUM_D65());
-    scene.add_plane(
-        Pt3(0., 100., 100.),
-        Vec3(0., -1., -1.).normalize(),
-        nullptr, &light, 200
-    );
+    // DirectionalLight light(spectra::ILLUM_D65());
+    // scene.add_plane(
+    //     Pt3(0., 100., 100.),
+    //     Vec3(0., -1., -1.).normalize(),
+    //     nullptr, &light, 200
+    // );
+    scene.add_light(std::make_unique<PointLight>(
+        Transform::translation(0.0f, 3.0f, 5.0f),
+        spectra::ILLUM_D65(),
+        10.0f
+    ));
+
     DiffuseMaterial material(SolidColor(0.8, 0.4, 0.8));
     scene.add_obj(filename, &material);
+
+    DiffuseMaterial floor(SolidColor(1.0, 1.0, 1.0));
+    scene.add_plane(
+        Pt3(0., -0.1, 0.),
+        Vec3(0., 1., 0.),
+        &floor
+    );
+
     scene.commit();
 
     Transform camera_t =

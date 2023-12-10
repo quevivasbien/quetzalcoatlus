@@ -39,11 +39,7 @@ Vec2 get_sphere_uv(const Vec3& n) {
     return Vec2(u, v);
 }
 
-std::optional<SurfaceInteraction> Scene::ray_intersect(
-    const Ray& ray,
-    const WavelengthSample& wavelengths,
-    Sampler& sampler
-) const {
+RTCRayHit create_rayhit(const Ray& ray, RTCScene scene) {
     alignas(16) RTCRayHit rayhit;
     rayhit.ray.org_x = ray.o.x;
     rayhit.ray.org_y = ray.o.y;
@@ -58,7 +54,17 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
     rayhit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
     rayhit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
 
-    rtcIntersect1(m_scene, &rayhit);
+    rtcIntersect1(scene, &rayhit);
+
+    return rayhit;
+}
+
+std::optional<SurfaceInteraction> Scene::ray_intersect(
+    const Ray& ray,
+    const WavelengthSample& wavelengths,
+    Sampler& sampler
+) const {
+    auto rayhit = create_rayhit(ray, m_scene);
 
     if (rayhit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
         return std::nullopt;
@@ -81,7 +87,7 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
 
     return SurfaceInteraction(
         ray.at(rayhit.ray.tfar),
-        -ray.d,
+        (-ray.d).normalize(),
         normal,
         uv,
         material,
@@ -89,95 +95,28 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
     );
 }
 
-// template <typename RHN, size_t N>
-// void build_rayhits(RHN& rayhits, const std::array<Ray, N>& rays, const std::array<int, N>& valid) {
-//     for (size_t i = 0; i < N; i++) {
-//         if (valid[i] == 0) {
-//             continue;
-//         }
-//         rayhits.ray.org_x[i] = rays[i].o.x;
-//         rayhits.ray.org_y[i] = rays[i].o.y;
-//         rayhits.ray.org_z[i] = rays[i].o.z;
-//         rayhits.ray.dir_x[i] = rays[i].d.x;
-//         rayhits.ray.dir_y[i] = rays[i].d.y;
-//         rayhits.ray.dir_z[i] = rays[i].d.z;
-//         rayhits.ray.tnear[i] = 0.0001f;
-//         rayhits.ray.tfar[i] = std::numeric_limits<float>::infinity();
-//         rayhits.ray.mask[i] = -1;
-//         rayhits.ray.flags[i] = 0;
-//         rayhits.hit.geomID[i] = RTC_INVALID_GEOMETRY_ID;
-//         rayhits.hit.instID[0][i] = RTC_INVALID_GEOMETRY_ID;
-//     }
-// }
+std::pair<std::optional<LightSample>, float> Scene::sample_lights(
+    const SurfaceInteraction& si,
+    const WavelengthSample& wavelengths,
+    Sampler& sampler
+) const {
+    if (m_lights.empty()) {
+        return {std::nullopt, 0.0f};
+    }
+    // randomly select a light to sample from
+    float u = sampler.sample_1d();
+    size_t i = static_cast<size_t>(u * m_lights.size());
+    return {m_lights[i]->sample(si, wavelengths, sampler), 1.0f / m_lights.size()};
+}
 
-// template <typename RHN, size_t N>
-// std::array<std::optional<SceneIntersection>, N> rayhit_result(
-//     const Scene* scene,
-//     const RHN& rayhits,
-//     const std::array<Ray, N>& rays,
-//     const std::array<int, N>& valid,
-//     const std::array<WavelengthSample, N>& wavelengths,
-//     Sampler& sampler
-// ) {
-//     std::array<std::optional<SceneIntersection>, N> result;
-//     for (size_t i = 0; i < N; i++) {
-//         if (valid[i] == 0) {
-//             continue;
-//         }
-//         auto geom_id = rayhits.hit.geomID[i];
-//         if (geom_id == RTC_INVALID_GEOMETRY_ID) {
-//             continue;
-//         }
-//         auto geom_data = scene->get_geom_data(geom_id);
-//         if (!geom_data) {
-//             std::cout << "Geometry data not found for intersected object" << std::endl;
-//             continue;
-//         }
-//         Vec3 normal = Vec3(rayhits.hit.Ng_x[i], rayhits.hit.Ng_y[i], rayhits.hit.Ng_z[i]).normalize();
-//         Vec2 uv(rayhits.hit.u[i], rayhits.hit.v[i]);
-//         if ((*geom_data)->shape == Shape::SPHERE) {
-//             uv = get_sphere_uv(normal);
-//         }
-//         ShapeIntersection isect(
-//             uv,
-//             normal,
-//             rays[i].at(rayhits.ray.tfar[i]),
-//             rays[i].d.dot(normal) < 0.0f,
-//             wavelengths[i]
-//         );
-//         const Material* material = (*geom_data)->material;
-//         result[i] = SceneIntersection(
-//             material->scatter(rays[i], isect, sampler),
-//             normal
-//         );
-//     }
-
-//     return result;
-// }
-
-// std::array<std::optional<SceneIntersection>, 4> Scene::ray_intersect(
-//     const std::array<Ray, 4>& rays,
-//     const std::array<WavelengthSample, 4>& wavelengths,
-//     Sampler& sampler,
-//     const std::array<int, 4>& valid
-// ) const {
-//     alignas(16) RTCRayHit4 rayhits;
-//     build_rayhits(rayhits, rays, valid);
-//     rtcIntersect4(valid.data(), m_scene, &rayhits);
-//     return rayhit_result(this, rayhits, rays, valid, wavelengths, sampler);
-// }
-
-// std::array<std::optional<SceneIntersection>, 8> Scene::ray_intersect(
-//     const std::array<Ray, 8>& rays,
-//     const std::array<WavelengthSample, 8>& wavelengths,
-//     Sampler& sampler,
-//     const std::array<int, 8>& valid
-// ) const {
-//     alignas(32) RTCRayHit8 rayhits;
-//     build_rayhits(rayhits, rays, valid);
-//     rtcIntersect8(valid.data(), m_scene, &rayhits);
-//     return rayhit_result(this, rayhits, rays, valid, wavelengths, sampler);
-// }
+bool Scene::occluded(Pt3 start, Pt3 end) const {
+    Ray ray(start, end - start);
+    auto rayhit = create_rayhit(ray, m_scene);
+    if (rayhit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
+        return false;
+    }
+    return rayhit.ray.tfar <= 1.0f;
+}
 
 unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material, const Light* light) {
     RTCGeometry geom = rtcNewGeometry(
@@ -417,4 +356,8 @@ unsigned int Scene::add_obj(const std::string& filename, const Material* materia
     rtcReleaseGeometry(geom);
 
     return geom_id;
+}
+
+void Scene::add_light(std::unique_ptr<Light>&& light) {
+    m_lights.push_back(std::move(light));
 }

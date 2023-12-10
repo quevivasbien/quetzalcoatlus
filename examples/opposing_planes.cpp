@@ -8,14 +8,14 @@
 int main() {
     Scene scene(initialize_device());
 
-    SimpleLight light(
-        std::make_shared<RGBIlluminantSpectrum>(RGB(2.6, 0.8, 1.2))
-    );
-    scene.add_plane(
-        Pt3(0., 0., 5.),
-        Vec3(-1., 0., -1.).normalize(),
-        nullptr, &light
-    );
+    // SimpleLight light(
+    //     std::make_shared<RGBIlluminantSpectrum>(RGB(2.6, 0.8, 1.2))
+    // );
+    // scene.add_plane(
+    //     Pt3(0., 0., 5.),
+    //     Vec3(-1., 0., -1.).normalize(),
+    //     nullptr, &light
+    // );
 
     ConductiveMaterial right_plane(
         std::make_shared<ConstantSpectrum>(1.2),

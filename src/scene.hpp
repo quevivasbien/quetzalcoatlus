@@ -46,20 +46,11 @@ public:
 
     // intersect a single ray with the scene
     std::optional<SurfaceInteraction> ray_intersect(const Ray& ray, const WavelengthSample& wavelengths, Sampler& sampler) const;
-    // // intersect a packet of 4 rays with the scene
-    // std::array<std::optional<SurfaceInteraction>, 4> ray_intersect(
-    //     const std::array<Ray, 4>& rays,
-    //     const std::array<WavelengthSample, 4>& wavelengths,
-    //     Sampler& sampler,
-    //     const std::array<int, 4>& valid = { -1, -1, -1, -1 }
-    // ) const;
-    // // intersect a packet of 8 rays with the scene
-    // std::array<std::optional<SurfaceInteraction>, 8> ray_intersect(
-    //     const std::array<Ray, 8>& rays,
-    //     const std::array<WavelengthSample, 8>& wavelengths,
-    //     Sampler& sampler,
-    //     const std::array<int, 8>& valid = { -1, -1, -1, -1, -1, -1, -1, -1 }
-    // ) const;
+
+    // sample illumination from lights at a given point
+    std::pair<std::optional<LightSample>, float> sample_lights(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const;
+    // check if end is visible from start
+    bool occluded(Pt3 start, Pt3 end) const;
 
     // methods for adding shapes to scene; return geometry ID
     // in cases where multiple points are required, they should be given in clockwise order around the outward face
@@ -71,6 +62,9 @@ public:
     unsigned int add_plane(const Pt3& p, const Vec3& n, const Material* material, const Light* light = nullptr, float half_size = 1000.0f);
 
     unsigned int add_obj(const std::string& filename, const Material* material, const Light* light = nullptr, const Transform& transform = Transform::identity());
+
+    // add a light to the scene
+    void add_light(std::unique_ptr<Light>&& light);
 
     std::optional<const GeometryData*> get_geom_data(unsigned int geom_id) const {
         const void* ptr = rtcGetGeometryUserDataFromScene(m_scene, geom_id);
@@ -93,5 +87,6 @@ private:
     // need to store data in a collection that doesn't reallocate on resize
     // since we'll be providing our geom objects with pointers to it
     std::deque<GeometryData> m_geom_data;
+    std::vector<std::unique_ptr<Light>> m_lights;
     bool m_ready = false;
 };

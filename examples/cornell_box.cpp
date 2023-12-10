@@ -13,14 +13,21 @@ int main() {
 
     auto light_spectrum = 
         std::make_shared<RGBIlluminantSpectrum>(RGB(6.0, 3.0, 3.0));
-    SimpleLight light(light_spectrum);
-    scene.add_quad(
-        Pt3(-1.f, 1.9999f, -6.f),
-        Pt3(1.f, 1.9999f, -6.f),
-        Pt3(1.f, 1.9999f, -4.f),
-        Pt3(-1.f, 1.9999f, -4.f),
-        nullptr, &light
+    scene.add_light(
+        std::make_unique<PointLight>(
+            Transform::translation(0.0f, 1.5f, -5.0f),
+            light_spectrum,
+            3.0f
+        )
     );
+    // SimpleLight light(light_spectrum);
+    // scene.add_quad(
+    //     Pt3(-1.f, 1.9999f, -6.f),
+    //     Pt3(1.f, 1.9999f, -6.f),
+    //     Pt3(1.f, 1.9999f, -4.f),
+    //     Pt3(-1.f, 1.9999f, -4.f),
+    //     nullptr, &light
+    // );
 
     DiffuseMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
     scene.add_quad(
@@ -62,7 +69,7 @@ int main() {
         Pt3(-2.f, 2.f, -7.f),
         &back_wall
     );
-    DielectricMaterial dielectric(std::make_shared<RGBUnboundedSpectrum>(RGB(0.8f, 1.2f, 1.8f)));
+    DielectricMaterial dielectric(std::make_shared<RGBUnboundedSpectrum>(RGB(1.1f, 1.8f, 3.0f)));
     scene.add_sphere(
         Pt3(-0.8f, -1.25f, -4.4f), 0.75f,
         &dielectric
