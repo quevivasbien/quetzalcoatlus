@@ -2,6 +2,7 @@
 
 #include "color/spectrum_sample.hpp"
 #include "vec.hpp"
+#include "shape.hpp"
 #include "transform.hpp"
 
 struct SurfaceInteraction;
@@ -27,9 +28,19 @@ public:
     
     virtual SpectrumSample total_emission(const WavelengthSample& wavelengths) const = 0;
 
-    virtual SpectrumSample emission(const SurfaceInteraction& si, const Vec3& wo, const WavelengthSample& wavelengths) const = 0;
+    // sample light received at point on surface (si refers to surface receiving light, not the light itself)
     virtual std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const = 0;
-    virtual float pdf(const SurfaceInteraction& si, const Vec3& wi) const = 0;
+    // get pdf for light from source, along wi to point p
+    // note that here p is the point that receives the light, not a point on the light
+    virtual float pdf(const Pt3& p, const Vec3& wi) const {
+        return 0.0f;
+    };
+    // get light emitted in a given direction; only valid for area lights
+    // here p is the point *on the light* and n is the surface normal at that point
+    // w is the direction in which the light is emitted
+    virtual SpectrumSample emission(const Pt3& p, const Vec3& n, const Vec3& w, const WavelengthSample& wavelengths) const {
+        return SpectrumSample(0.0f);
+    }
 
     LightType type() const {
         return m_type;
@@ -48,10 +59,34 @@ public:
 
     SpectrumSample total_emission(const WavelengthSample& wavelengths) const override;
 
-    SpectrumSample emission(const SurfaceInteraction& si, const Vec3& wo, const WavelengthSample& wavelengths) const override;
     std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const override;
-    float pdf(const SurfaceInteraction& si, const Vec3& wi) const override;
 
 private:
     float m_scale;
+};
+
+
+class AreaLight : public Light {
+public:
+    AreaLight(
+        const Transform& render_from_light,
+        std::unique_ptr<Shape>&& shape,
+        std::shared_ptr<const Spectrum> spectrum,
+        float scale = 1.0f,
+        bool two_sided = false
+    ) : Light(render_from_light, spectrum, AREA), m_shape(std::move(shape)), m_scale(scale), m_two_sided(two_sided) {
+        m_area = m_shape->area();
+    }
+
+    SpectrumSample total_emission(const WavelengthSample& wavelengths) const override;
+
+    std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const override;
+    float pdf(const Pt3& p, const Vec3& wi) const override;
+    SpectrumSample emission(const Pt3& p, const Vec3& n, const Vec3& w, const WavelengthSample& wavelengths) const override;
+
+private:
+    std::unique_ptr<Shape> m_shape;
+    float m_scale;
+    bool m_two_sided;
+    float m_area;
 };

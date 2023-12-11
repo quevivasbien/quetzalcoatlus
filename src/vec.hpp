@@ -81,6 +81,7 @@ class Pt3 : public Vec3 {
 public:
     Pt3() : Vec3() {}
     Pt3(float x, float y, float z) : Vec3(x, y, z) {}
+    explicit Pt3(Vec3&& v) : Vec3(std::move(v)) {}
 
     Pt3 operator+(const Vec3 &v2) const;
     Pt3& operator+=(const Vec3 &v2);

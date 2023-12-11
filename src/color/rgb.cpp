@@ -48,12 +48,11 @@ RGB RGBColorSpace::rgb_from_sample(const SpectrumSample& ss, const WavelengthSam
 
 RGBSigmoidPolynomial RGBColorSpace::to_spectrum(const RGB& rgb) const {
     return m_table->operator()(RGB(
-        std::max(rgb.x, 0.0f),
-        std::max(rgb.y, 0.0f),
-        std::max(rgb.z, 0.0f)
+        std::clamp(rgb.x, 0.0f, 1.0f),
+        std::clamp(rgb.y, 0.0f, 1.0f),
+        std::clamp(rgb.z, 0.0f, 1.0f)
     ));
 }
-
 
 float sigmoid(float x) {
     if (std::isinf(x)) {
@@ -174,6 +173,8 @@ RGBUnboundedSpectrum::RGBUnboundedSpectrum(RGB rgb, const RGBColorSpace& cs) {
     RGB rgb_ = m_scale ? RGB(rgb / m_scale) : RGB(0, 0, 0);
     m_polynomial = cs.to_spectrum(rgb_);
 }
+
+RGBUnboundedSpectrum::RGBUnboundedSpectrum(float r, float g, float b, const RGBColorSpace& cs) : RGBUnboundedSpectrum(RGB(r, g, b), cs) {}
 
 float RGBUnboundedSpectrum::operator()(float lambda) const {
     return m_scale * m_polynomial(lambda);

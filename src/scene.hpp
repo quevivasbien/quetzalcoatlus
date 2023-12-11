@@ -19,7 +19,7 @@
 
 RTCDevice initialize_device();
 
-enum Shape {
+enum ShapeType {
     SPHERE,
     TRIANGLE,
     QUAD,
@@ -27,7 +27,7 @@ enum Shape {
 };
 
 struct GeometryData {
-    Shape shape;
+    ShapeType shape;
     const Material* material;
     const Light* light;
 };

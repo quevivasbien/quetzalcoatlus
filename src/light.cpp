@@ -5,14 +5,6 @@ SpectrumSample PointLight::total_emission(const WavelengthSample& wavelengths) c
     return SpectrumSample::from_spectrum(*m_spectrum, wavelengths) * (4.0f * M_PI * m_scale);
 }
 
-SpectrumSample PointLight::emission(const SurfaceInteraction& si, const Vec3& wo, const WavelengthSample& wavelengths) const {
-    return SpectrumSample(0.0f);
-}
-
-float PointLight::pdf(const SurfaceInteraction& si, const Vec3& wi) const {
-    return 0.0f;
-}
-
 std::optional<LightSample> PointLight::sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const {
     Pt3 p = m_render_from_light * Pt3(0.0f, 0.0f, 0.0f);
     Vec3 wi = (p - si.point).normalize();
@@ -23,4 +15,40 @@ std::optional<LightSample> PointLight::sample(const SurfaceInteraction& si, cons
         .pdf = 1.0f,
         .p_light = p
     };
+}
+
+
+SpectrumSample AreaLight::total_emission(const WavelengthSample& wavelengths) const {
+    auto spec = SpectrumSample::from_spectrum(*m_spectrum, wavelengths);
+    return spec * (M_PI * (m_two_sided ? 2.0f : 1.0f) * m_area);
+}
+
+
+std::optional<LightSample> AreaLight::sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const {
+    auto ss = m_shape->sample_point(sampler);
+    if (ss.pdf == 0.0f || (ss.p - si.point).norm_squared() == 0.0f) {
+        return std::nullopt;
+    }
+    Vec3 wi = (ss.p - si.point).normalize();
+    auto spec = emission(ss.p, ss.normal, -wi, wavelengths);
+    if (spec.is_zero()) {
+        return std::nullopt;
+    }
+    return LightSample {
+        .spec = spec,
+        .wi = wi,
+        .pdf = ss.pdf,
+        .p_light = ss.p
+    };
+}
+
+float AreaLight::pdf(const Pt3& p, const Vec3& wi) const {
+    
+}
+
+SpectrumSample AreaLight::emission(const Pt3& p, const Vec3& n, const Vec3& w, const WavelengthSample& wavelengths) const {
+    if (!m_two_sided && n.dot(w) < 0.0f) {
+        return SpectrumSample(0.0f);
+    }
+    return SpectrumSample::from_spectrum(*m_spectrum, wavelengths) * m_scale;
 }

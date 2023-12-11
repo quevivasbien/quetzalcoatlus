@@ -61,7 +61,7 @@ PixelSample sample_pixel(
             sample.normal = isect->normal;
         }
         // TODO: change this when specular bounce and light sampling is implemented
-        sample.color += weight * isect->emission(-ray.d, wavelengths);
+        // sample.color += weight * isect->emission(-ray.d, wavelengths);
         if (depth == max_bounces) {
             break;
         }

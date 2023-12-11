@@ -26,7 +26,7 @@ void Scene::commit() {
 }
 
 Vec2 get_sphere_uv(const Vec3& n) {
-    float phi = atan2f(n.z, n.x) + M_PI;
+    float phi = std::atan2(n.z, n.x) + M_PI;
     float u = phi / (2.0f * M_PI);
     if (u >= 1.0f) {
         u -= __FLT_EPSILON__;
@@ -79,7 +79,7 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
     auto [shape, material, light] = *geom_data_opt.value();
     Vec3 normal = Vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
     Vec2 uv(rayhit.hit.u, rayhit.hit.v);
-    if (shape == Shape::SPHERE) {
+    if (shape == ShapeType::SPHERE) {
         // embree doesn't have uv coordinates for spheres
         // need to calculate this manually
         uv = get_sphere_uv(normal);
@@ -152,7 +152,7 @@ unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const
     else {
         printf("Something went wrong when making triangle\n");
     }
-    m_geom_data.push_back({ Shape::TRIANGLE, material, light });
+    m_geom_data.push_back({ ShapeType::TRIANGLE, material, light });
     rtcSetGeometryUserData(geom, &m_geom_data.back());
 
     rtcCommitGeometry(geom);
@@ -205,7 +205,7 @@ unsigned int Scene::add_quad(
     else {
         printf("Something went wrong when making quad\n");
     }
-    m_geom_data.push_back({ Shape::QUAD, material, light });
+    m_geom_data.push_back({ ShapeType::QUAD, material, light });
     rtcSetGeometryUserData(geom, &m_geom_data.back());
 
     rtcCommitGeometry(geom);
@@ -252,7 +252,7 @@ unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* 
     else {
         printf("Something went wrong when making sphere\n");
     }
-    m_geom_data.push_back({ Shape::SPHERE, material, light });
+    m_geom_data.push_back({ ShapeType::SPHERE, material, light });
     rtcSetGeometryUserData(geom, &m_geom_data.back());
 
     rtcCommitGeometry(geom);
@@ -348,7 +348,7 @@ unsigned int Scene::add_obj(const std::string& filename, const Material* materia
         printf("Something went wrong when making obj\n");
     }
 
-    m_geom_data.push_back({ Shape::OBJ, material, light });
+    m_geom_data.push_back({ ShapeType::OBJ, material, light });
     rtcSetGeometryUserData(geom, &m_geom_data.back());
 
     rtcCommitGeometry(geom);
