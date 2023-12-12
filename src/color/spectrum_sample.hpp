@@ -54,6 +54,8 @@ public:
 
     bool is_zero() const;
 
+    float max_component() const;
+
     // arithmetic operators
     SpectrumSample operator+(const SpectrumSample& other) const;
     SpectrumSample& operator+=(const SpectrumSample& other);

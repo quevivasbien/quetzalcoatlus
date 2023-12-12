@@ -7,11 +7,18 @@
 #include "random.hpp"
 #include "vec.hpp"
 
+struct ScatterType {
+    bool specular = false;
+    bool transmission = false;
+};
+
 struct BSDFSample {
     SpectrumSample spec;
     Vec3 wi;
     float pdf = 0.0f;
-    bool specular = false;
+    float ior = 1.0f;
+    bool pdf_is_proportional = false;
+    ScatterType scatter_type;
 };
 
 
@@ -25,7 +32,7 @@ public:
     // sample incident light direction for a given outgoing direction
     virtual std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const = 0;
 
-    virtual float pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const = 0;
+    virtual float pdf(Vec3 wo, Vec3 wi) const = 0;
 
     // hemispherical-directional reflectance
     SpectrumSample reflectance(Vec3 wo, Sampler& sampler, size_t n_samples) const;
@@ -49,7 +56,7 @@ public:
 
     std::optional<BSDFSample> sample(Vec3 wo_render, Sampler& sampler) const;
 
-    float pdf(Vec3 wo_render, Vec3 wi_render, const Sampler& sampler) const;
+    float pdf(Vec3 wo_render, Vec3 wi_render) const;
 
     SpectrumSample reflectance(Vec3 wo_render, Sampler& sampler, size_t n_samples) const;
 
@@ -70,7 +77,7 @@ public:
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
     std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
-    float pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const override;
+    float pdf(Vec3 wo, Vec3 wi) const override;
 
 private:
     SpectrumSample m_reflectance;
@@ -84,7 +91,7 @@ public:
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
     std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
-    float pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const override;
+    float pdf(Vec3 wo, Vec3 wi) const override;
 
 private:
     SpectrumSample m_ior;
@@ -98,7 +105,7 @@ public:
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
     std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
-    float pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const override;
+    float pdf(Vec3 wo, Vec3 wi) const override;
 
     bool is_specular() const override { return true; }
 
@@ -113,7 +120,7 @@ public:
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
     std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
-    float pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const override;
+    float pdf(Vec3 wo, Vec3 wir) const override;
 
     bool is_specular() const override { return true; }
 

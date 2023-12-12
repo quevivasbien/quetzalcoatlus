@@ -19,7 +19,7 @@ struct SurfaceInteraction : public Interaction {
         const Vec3& normal,
         const Vec2& uv,
         const Material* material,
-        const Light* light
+        const AreaLight* light
     ) : Interaction { point, wo, normal, uv }, material(material), light(light) {}
 
     std::optional<BSDF> bsdf(const Ray& ray, WavelengthSample& wavelengths, Sampler& sampler) const {

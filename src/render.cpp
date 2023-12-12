@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -40,6 +41,48 @@ struct PixelSample {
     }
 };
 
+float power_heuristic(int n_f, float f_pdf, int n_g, float g_pdf) {
+    float f = n_f * f_pdf;
+    float g = n_g * g_pdf;
+    if (std::isinf(f * f)) {
+        return 1.0f;
+    }
+    return f * f / (f * f + g * g);
+}
+
+SpectrumSample sample_lights(
+    const Scene& scene,
+    const SurfaceInteraction& si,
+    const BSDF& bsdf,
+    const WavelengthSample& wavelengths,
+    Sampler& sampler
+) {
+    auto [light, sample_proba] = scene.sample_lights(si.point, si.normal, sampler);
+    if (!light) {
+        sampler.sample_2d();  // need to do this to keep sampler depth even
+        return SpectrumSample(0.0f);
+    }
+    auto ls = light->sample(si, wavelengths, sampler);
+    if (!ls || ls->spec.is_zero() || ls->pdf == 0.0f) {
+        return SpectrumSample(0.0f);
+    }
+    Vec3 wo = si.wo;
+    Vec3 wi = ls->wi;
+    auto f = bsdf(wo, wi) * std::abs(wi.dot(si.normal));
+    if (f.is_zero() || scene.occluded(si.point, ls->p_light)) {
+        return SpectrumSample(0.0f);
+    }
+    float p_l = sample_proba * ls->pdf;
+    if (light->type() == LightType::AREA) {
+        float p_b = bsdf.pdf(wo, wi);
+        float w_l = power_heuristic(1, p_l, 1, p_b);
+        return ls->spec * f * (w_l / p_l);
+    }
+    else {
+        return ls->spec * f / p_l;
+    }
+}
+
 PixelSample sample_pixel(
     Ray ray,
     const Scene& scene,
@@ -50,48 +93,83 @@ PixelSample sample_pixel(
     PixelSample sample{};
     SpectrumSample weight(1.0f);
     size_t depth = 0;
-    bool specular_bounce = true;
+    bool specular_bounce = false;
+    bool any_nonspecular_bounce = false;
+    float p_b = 1.0f;
+    float ior_scale = 1.0f;
+    Pt3 last_p;
+    Vec3 last_normal;
     // TODO: Handle weights of light sampling, specular bounce
     while (!weight.is_zero()) {
-        auto isect = scene.ray_intersect(ray, wavelengths, sampler);
+        auto si = scene.ray_intersect(ray, wavelengths, sampler);
         // no intersection, add background and break
-        if (!isect) {
+        if (!si) {
             break;
         }
         if (depth == 0) {
-            sample.normal = isect->normal;
+            sample.normal = si->normal;
         }
-        if (specular_bounce) {
-            sample.color += weight * isect->emission(-ray.d, wavelengths);
+        auto emitted = si->emission(-ray.d, wavelengths);
+        if (!emitted.is_zero()) {
+            if (depth == 0 || specular_bounce) {
+                sample.color += weight * emitted;
+            }
+            else {
+                // compute importance-sampled weight for area light
+                auto light = si->light;
+                assert(light);
+                float light_proba = scene.light_sample_pmf(last_p, last_normal, light)
+                    * light->pdf(last_p, ray.d);
+                float light_weight = power_heuristic(1, p_b, 1, light_proba);
+
+                sample.color += emitted * (weight * light_weight);
+            }
         }
         if (depth == max_bounces) {
             break;
         }
-        auto bsdf = isect->bsdf(ray, wavelengths, sampler);
+        auto bsdf = si->bsdf(ray, wavelengths, sampler);
         if (!bsdf) {
-            ray = isect->skip_intersection(ray);
+            ray = si->skip_intersection(ray);
             continue;
         }
         
-        auto [light_sample, proba] = scene.sample_lights(*isect, wavelengths, sampler);
-        if (light_sample && !light_sample->spec.is_zero() && light_sample->pdf > 0.0f) {
-            auto f = (*bsdf)(isect->wo, light_sample->wi);
-            if (!f.is_zero() && !scene.occluded(isect->point, light_sample->p_light)) {
-                sample.color += weight * f * light_sample->spec / (proba * light_sample->pdf);
-            }
+        if (!bsdf->is_specular()) {
+            // sample direct illumination from light sources
+            sample.color += weight * sample_lights(scene, *si, *bsdf, wavelengths, sampler);
         }
 
-        auto bsdf_sample = bsdf->sample(isect->wo, sampler);
+        auto bsdf_sample = bsdf->sample(si->wo, sampler);
         if (!bsdf_sample) {
             break;
         }
         if (depth == 0) {
             sample.albedo = bsdf_sample->spec;
         }
-        weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(isect->normal)) / bsdf_sample->pdf;
-        ray = Ray(isect->point, bsdf_sample->wi);
+
+        weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(si->normal)) / bsdf_sample->pdf;
+
+        p_b = bsdf_sample->pdf_is_proportional ? bsdf->pdf(si->wo, bsdf_sample->wi) : bsdf_sample->pdf;
+        specular_bounce = bsdf_sample->scatter_type.specular;
+        any_nonspecular_bounce |= !specular_bounce;
+        if (bsdf_sample->scatter_type.transmission) {
+            ior_scale *= bsdf_sample->ior;
+        }
+        last_p = si->point;
+        last_normal = si->normal;
+
+        ray = Ray(si->point, bsdf_sample->wi);
         depth++;
-        specular_bounce = bsdf_sample->specular;
+
+        // maybe terminate early (russian roulette)
+        auto rr_weight = weight * ior_scale;
+        if (rr_weight.max_component() < 1.f && depth > 1) {
+            float q = std::max(0.0f, 1.0f - rr_weight.max_component());
+            if (sampler.sample_1d() < q) {
+                break;
+            }
+            weight /= 1.0f - q;
+        }
     }
 
     return sample;
@@ -179,17 +257,6 @@ RenderResult render(
         std::cout << "Scene must be committed before rendering." << std::endl;
         return result;
     }
-
-    // check that ray packet size is compatible with machine
-    #if PACKET_SIZE == 4
-    if (rtcGetDeviceProperty(scene.get_device(), RTC_DEVICE_PROPERTY_NATIVE_RAY4_SUPPORTED) == 0) {
-        std::cout << "Warning: packet size 4 selected but not supported" << std::endl;
-    }
-    #elif PACKET_SIZE == 8
-    if (rtcGetDeviceProperty(scene.get_device(), RTC_DEVICE_PROPERTY_NATIVE_RAY8_SUPPORTED) == 0) {
-        std::cout << "Warning: packet size 8 selected but not supported" << std::endl;
-    }
-    #endif
     
     size_t image_size = result.width * result.height;
     #ifdef MULTITHREADED
@@ -214,7 +281,7 @@ RenderResult render(
             }
         }
 
-        auto sampler = sampler_prototype;
+        auto sampler = HaltonSampler(sampler_prototype);
 
         threads.push_back(std::thread(
             render_pixels,

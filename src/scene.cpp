@@ -95,18 +95,21 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
     );
 }
 
-std::pair<std::optional<LightSample>, float> Scene::sample_lights(
-    const SurfaceInteraction& si,
-    const WavelengthSample& wavelengths,
+std::pair<const Light*, float> Scene::sample_lights(
+    const Pt3& point, const Vec3& normal,
     Sampler& sampler
 ) const {
     if (m_lights.empty()) {
-        return {std::nullopt, 0.0f};
+        return {nullptr, 0.0f};
     }
     // randomly select a light to sample from
     float u = sampler.sample_1d();
     size_t i = static_cast<size_t>(u * m_lights.size());
-    return {m_lights[i]->sample(si, wavelengths, sampler), 1.0f / m_lights.size()};
+    return {m_lights[i].get(), 1.0f / m_lights.size()};
+}
+
+float Scene::light_sample_pmf(const Pt3& point, const Vec3& normal, const Light* light) const {
+    return 1.0f / m_lights.size();
 }
 
 bool Scene::occluded(Pt3 start, Pt3 end) const {
@@ -362,13 +365,14 @@ GeometryData* Scene::add_obj(const std::string& filename, const Material* materi
 void Scene::add_light(std::unique_ptr<Light>&& light) { 
     if (light->type() == LightType::AREA) {
         // add the light's geometry to the scene
-        const Shape* shape = static_cast<const AreaLight*>(light.get())->shape();
+        auto area_light = static_cast<const AreaLight*>(light.get());
+        const Shape* shape = area_light->shape();
         auto shape_type = shape->type();
         if (shape_type == ShapeType::SPHERE) {
             const Sphere* sphere = static_cast<const Sphere*>(shape);
             auto geom_data = add_sphere(sphere->m_center, sphere->m_radius, nullptr);
             if (geom_data) {
-                geom_data->light = light.get();
+                geom_data->light = area_light;
             }
         }
         else if (shape_type == ShapeType::QUAD) {
@@ -376,7 +380,7 @@ void Scene::add_light(std::unique_ptr<Light>&& light) {
             auto [a, b, c, d] = quad->get_vertices();
             auto geom_data = add_quad(a, b, c, d, nullptr);
             if (geom_data) {
-                geom_data->light = light.get();
+                geom_data->light = area_light;
             }
         }
         else {

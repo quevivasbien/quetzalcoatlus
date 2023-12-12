@@ -84,13 +84,13 @@ std::optional<BSDFSample> BSDF::sample(Vec3 wo_render, Sampler& sampler) const {
     return *bs;
 }
 
-float BSDF::pdf(Vec3 wo_render, Vec3 wi_render, const Sampler& sampler) const {
+float BSDF::pdf(Vec3 wo_render, Vec3 wi_render) const {
     Vec3 wi = local_from_render(wi_render);
     Vec3 wo = local_from_render(wo_render);
     if (wo.z == 0.0f) {
         return 0.0f;
     }
-    return m_bxdf->pdf(wo, wi, sampler);
+    return m_bxdf->pdf(wo, wi);
 }
 
 SpectrumSample BSDF::reflectance(Vec3 wo_render, Sampler& sampler, size_t n_samples) const {
@@ -122,11 +122,11 @@ std::optional<BSDFSample> DiffuseBxDF::sample(Vec3 wo, Sampler& sampler) const {
     };
 }
 
-float DiffuseBxDF::pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const {
+float DiffuseBxDF::pdf(Vec3 wo, Vec3 wi) const {
     if (wo.z * wi.z <= 0.0f) {
         return 0.0f;
     }
-    return sampler.cosine_hemisphere_pdf(abs_cos_theta(wi));
+    return Sampler::cosine_hemisphere_pdf(abs_cos_theta(wi));
 }
 
 
@@ -213,12 +213,14 @@ std::optional<BSDFSample> ConductorBxDF::sample(Vec3 wo, Sampler& sampler) const
         .spec = spec,
         .wi = wi,
         .pdf = 1.0f,
-        .specular = true,
+        .scatter_type = ScatterType {
+            .transmission = true
+        },
     };
     // todo: allow for rough surfaces
 }
 
-float ConductorBxDF::pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const {
+float ConductorBxDF::pdf(Vec3 wo, Vec3 wi) const {
     return 0.0f;
     // todo: allow for rough surfaces
 }
@@ -239,7 +241,9 @@ std::optional<BSDFSample> DielectricBxDF::sample(Vec3 wo, Sampler& sampler) cons
             .spec = spec_r,
             .wi = wi,
             .pdf = r / (r + t),
-            .specular = true
+            .scatter_type = ScatterType {
+                .specular = true
+            }
         };
     }
     else {
@@ -255,12 +259,15 @@ std::optional<BSDFSample> DielectricBxDF::sample(Vec3 wo, Sampler& sampler) cons
             .spec = spec_t,
             .wi = wi,
             .pdf = t / (r + t),
-            .specular = true
+            .scatter_type = ScatterType {
+                .specular = true,
+                .transmission = true
+            }
         };
     }
 }
 
-float DielectricBxDF::pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const {
+float DielectricBxDF::pdf(Vec3 wo, Vec3 wi) const {
     return 0.0f;
 }
 
@@ -298,6 +305,6 @@ std::optional<BSDFSample> ThinDielectricBxDF::sample(Vec3 wo, Sampler& sampler) 
 }
 
 
-float ThinDielectricBxDF::pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const {
+float ThinDielectricBxDF::pdf(Vec3 wo, Vec3 wi) const {
     return 0.0f;
 }

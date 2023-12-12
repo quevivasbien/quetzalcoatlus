@@ -28,25 +28,25 @@ public:
 
     Vec2 sample_uniform_disk();
     Vec3 sample_uniform_hemisphere();
-    float uniform_hemisphere_pdf() const {
+    static float uniform_hemisphere_pdf() {
         return 0.5 * M_1_PI;
     }
     Vec3 sample_uniform_sphere();
-    float uniform_sphere_pdf() const {
+    static float uniform_sphere_pdf() {
         return 0.25 * M_1_PI;
     }
     Vec3 sample_cosine_hemisphere();
-    float cosine_hemisphere_pdf(float cos_theta) const {
+    static float cosine_hemisphere_pdf(float cos_theta) {
         return cos_theta * M_1_PI;
     }
 
     // sample from a distribution on [0, 1] whose pdf is lerp(a, b, x)
     // not that this is a nonlinear sample over [0, 1], *not* a uniform sample over [a, b]
     float sample_linear(float a, float b);
-    float linear_pdf(float x, float a, float b);
+    static float linear_pdf(float x, float a, float b);
     // same idea as sample_linear, but for a bilinear patch
     Vec2 sample_bilinear(const std::array<float, 4>& w);
-    float bilinear_pdf(const Vec2& uv, const std::array<float, 4>& w);
+    static float bilinear_pdf(const Vec2& uv, const std::array<float, 4>& w);
 
 protected:
     int m_samples_per_pixel;

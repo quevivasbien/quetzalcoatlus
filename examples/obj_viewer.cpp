@@ -36,7 +36,7 @@ int main(int argc, const char* const argv[]) {
 
     Scene scene(initialize_device());
 
-    auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(4.0, 1.0, 3.0));
+    auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 2.0, 3.0));
     scene.add_light(std::make_unique<AreaLight>(
         std::make_unique<Quad>(
             Pt3(4.f, 6.f, 8.f),
@@ -44,10 +44,10 @@ int main(int argc, const char* const argv[]) {
             Vec3(0.f, 3.f, -3.f)
         ),
         light_spectrum,
-        1.0f
+        8.0f
     ));
 
-    DiffuseMaterial material(SolidColor(1.0, 1.0, 1.0));
+    DiffuseMaterial material(SolidColor(1.0, 6.0, 1.0));
     // DielectricMaterial material(std::make_shared<RGBUnboundedSpectrum>(1.2, 1.4, 3.0));
     scene.add_obj(filename, &material);
 

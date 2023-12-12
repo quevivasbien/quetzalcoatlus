@@ -22,7 +22,7 @@ RTCDevice initialize_device();
 struct GeometryData {
     ShapeType shape;
     const Material* material;
-    const Light* light;
+    const AreaLight* light;
 };
 
 class Scene {
@@ -41,7 +41,9 @@ public:
     std::optional<SurfaceInteraction> ray_intersect(const Ray& ray, const WavelengthSample& wavelengths, Sampler& sampler) const;
 
     // sample illumination from lights at a given point
-    std::pair<std::optional<LightSample>, float> sample_lights(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const;
+    std::pair<const Light*, float> sample_lights(const Pt3& point, const Vec3& normal, Sampler& sampler) const;
+    // get proba of sampling a given light
+    float light_sample_pmf(const Pt3& point, const Vec3& normal, const Light* light) const;
     // check if end is visible from start
     bool occluded(Pt3 start, Pt3 end) const;
 

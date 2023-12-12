@@ -27,8 +27,8 @@ public:
     // get pdf for sampled point on the shape's surface
     virtual float area() const = 0;
     virtual float pdf(const Pt3& p) const {
-        1.0f / area();
-    };
+        return 1.0f / area();
+    }
     virtual ShapeType type() const = 0;
 };
 

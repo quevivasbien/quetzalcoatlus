@@ -86,7 +86,7 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 64;
+    size_t n_samples = 16;
     size_t max_bounces = 64;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
