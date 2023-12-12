@@ -25,73 +25,35 @@ public:
     // randomly sample a point on the shape's surface
     virtual ShapeSample sample_point(Sampler& sampler) const = 0;
     // get pdf for sampled point on the shape's surface
-    virtual float pdf(const Pt3& p) const = 0;
     virtual float area() const = 0;
+    virtual float pdf(const Pt3& p) const {
+        1.0f / area();
+    };
     virtual ShapeType type() const = 0;
 };
 
 
+// A 2d parallelogram
+// The points of the parallelogram are p00, p00 + du, p00 + du + dv, p00 + dv
+// The normal points in the direction of du x dv
 class Quad : public Shape {
 public:
-    Quad(const Pt3& p00, const Pt3& p10, const Pt3& p11, const Pt3& p01)
-        : m_p00(p00), m_p10(p10), m_p11(p11), m_p01(p01), m_normal((p10 - p00).cross(p01 - p00).normalize()) {
-            if (p00 == p10 || p10 == p11 || p11 == p01 || p01 == p00) {
-                return;
-            }
-            // check if vertices are coplanar
-            if ((std::abs(m_normal.dot((p11 - p00).normalize()))) > 1e-5f) {
-                return;
-            }
-            // check if planar vertices form a rectangle by checking if vertices are equidistant from center
-            Pt3 center = Pt3(p00 + p10 + p11 + p01 / 4.0f);
-            std::array<float, 4> distances = {
-                (p00 - center).norm_squared(),
-                (p10 - center).norm_squared(),
-                (p11 - center).norm_squared(),
-                (p01 - center).norm_squared()
-            };
-            for (int i = 1; i < 3; i++) {
-                if (std::abs(distances[i] - distances[0]) / distances[0] > 1e-4f) {
-                    return;
-                }
-            }
-            m_is_rectangle = true;
-        }
-
-    Pt3 point_from_uv(const Vec2& uv) const {
-        return Pt3((1.0f - uv.y) * ((1.0f - uv.x) * m_p00 + uv.x * m_p10) + uv.y * ((1.0f - uv.x) * m_p01 + uv.x * m_p11));
-    }
+    Quad(const Pt3& p00, const Vec3& du, const Vec3& dv)
+        : m_p00(p00), m_du(du), m_dv(dv), m_normal(du.cross(dv).normalize()), m_area(du.cross(dv).norm()) {}
 
     ShapeSample sample_point(Sampler& sampler) const override {
-        float pdf_ = 1.0f;
-        Vec2 uv;
-        if (m_is_rectangle) {
-            uv = sampler.sample_2d();
-        }
-        else {
-            // sample with appropriate uniform area sampling
-            std::array<float, 4> w = {
-                (m_p10 - m_p00).cross(m_p01 - m_p00).norm(),
-                (m_p10 - m_p00).cross(m_p11 - m_p10).norm(),
-                (m_p01 - m_p00).cross(m_p11 - m_p01).norm(),
-                (m_p11 - m_p10).cross(m_p11 - m_p01).norm()
-            };
-            uv = sampler.sample_bilinear(w);
-            pdf_ = sampler.bilinear_pdf(uv, w);
-        }
-        Vec3 pu0 = m_p00 * (1.0f - uv.y) + m_p01 * uv.y;
-        Vec3 pu1 = m_p10 * (1.0f - uv.y) + m_p11 * uv.y;
-        Pt3 p = Pt3(pu0 * (1.0f - uv.x) + pu1 * uv.x);
-        return { p, m_normal, pdf_ };
+        Vec2 uv = sampler.sample_2d();
+        Pt3 p = m_p00 + m_du * uv.x + m_dv * uv.y;
+        return { p, m_normal, 1.0f / area() };
     }
 
     float area() const override {
-        return 0.5f * ((m_p10 - m_p00).cross(m_p01 - m_p00).norm() + (m_p01 - m_p11).cross(m_p10 - m_p11).norm());
+        return m_area;
     }
 
     float pdf(const Pt3& p) const override {
         //todo!
-        return 0;
+        return 1.0f / area();
     }
 
     ShapeType type() const override {
@@ -99,17 +61,15 @@ public:
     }
 
     std::tuple<Pt3, Pt3, Pt3, Pt3> get_vertices() const {
-        return { m_p00, m_p10, m_p11, m_p01 };
+        return { m_p00, m_p00 + m_du, m_p00 + m_du + m_dv, m_p00 + m_dv };
     }
 
 private:
     Vec3 m_normal;
     Pt3 m_p00;
-    Pt3 m_p10;
-    Pt3 m_p11;
-    Pt3 m_p01;
-
-    bool m_is_rectangle = false;
+    Vec3 m_du;
+    Vec3 m_dv;
+    float m_area;
 };
 
 class Sphere : public Shape {
@@ -119,7 +79,7 @@ public:
     ShapeSample sample_point(Sampler& sampler) const override {
         Vec3 n = sampler.sample_uniform_sphere();
         auto p = m_center + m_radius * n;
-        return { p, n, sampler.uniform_sphere_pdf() };
+        return { p, n, 1.0f / area() };
     }
 
     float area() const override {

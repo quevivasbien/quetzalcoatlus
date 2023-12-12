@@ -50,18 +50,20 @@ PixelSample sample_pixel(
     PixelSample sample{};
     SpectrumSample weight(1.0f);
     size_t depth = 0;
+    bool specular_bounce = true;
+    // TODO: Handle weights of light sampling, specular bounce
     while (!weight.is_zero()) {
         auto isect = scene.ray_intersect(ray, wavelengths, sampler);
         // no intersection, add background and break
-        // TODO: add background / infinite lights
         if (!isect) {
             break;
         }
         if (depth == 0) {
             sample.normal = isect->normal;
         }
-        // TODO: change this when specular bounce and light sampling is implemented
-        sample.color += weight * isect->emission(-ray.d, wavelengths);
+        if (specular_bounce) {
+            sample.color += weight * isect->emission(-ray.d, wavelengths);
+        }
         if (depth == max_bounces) {
             break;
         }
@@ -89,6 +91,7 @@ PixelSample sample_pixel(
         weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(isect->normal)) / bsdf_sample->pdf;
         ray = Ray(isect->point, bsdf_sample->wi);
         depth++;
+        specular_bounce = bsdf_sample->specular;
     }
 
     return sample;
@@ -197,11 +200,7 @@ RenderResult render(
     );
     std::cout << "Using " << n_threads << " threads" << std::endl;
 
-    std::vector<HaltonSampler> samplers;
-    samplers.reserve(n_threads);
-    for (size_t t = 0; t < n_threads; t++) {
-        samplers.push_back(HaltonSampler(n_samples, camera.image_width, camera.image_height, t));
-    }
+    HaltonSampler sampler_prototype(n_samples, camera.image_width, camera.image_height, 0);
 
     size_t end_index = 0;
     std::mutex mutex;
@@ -215,11 +214,13 @@ RenderResult render(
             }
         }
 
+        auto sampler = sampler_prototype;
+
         threads.push_back(std::thread(
             render_pixels,
             std::ref(camera),
             std::ref(scene),
-            std::ref(samplers[t]),
+            std::ref(sampler),
             max_bounces,
             std::ref(result),
             start_index,

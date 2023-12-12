@@ -19,7 +19,7 @@ std::optional<LightSample> PointLight::sample(const SurfaceInteraction& si, cons
 
 SpectrumSample AreaLight::total_emission(const WavelengthSample& wavelengths) const {
     auto spec = SpectrumSample::from_spectrum(*m_spectrum, wavelengths);
-    return spec * (M_PI * (m_two_sided ? 2.0f : 1.0f) * m_area);
+    return spec * (M_PI * (m_two_sided ? 2.0f : 1.0f) * m_shape->area() * m_scale);
 }
 
 
@@ -42,8 +42,7 @@ std::optional<LightSample> AreaLight::sample(const SurfaceInteraction& si, const
 }
 
 float AreaLight::pdf(const Pt3& p, const Vec3& wi) const {
-    // TODO: fix this
-    return 1.0f / m_shape->area();
+    return m_shape->pdf(p);
 }
 
 SpectrumSample AreaLight::emission(const Pt3& p, const Vec3& n, const Vec3& w, const WavelengthSample& wavelengths) const {

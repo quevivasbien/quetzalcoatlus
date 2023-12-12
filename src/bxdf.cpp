@@ -212,7 +212,8 @@ std::optional<BSDFSample> ConductorBxDF::sample(Vec3 wo, Sampler& sampler) const
     return BSDFSample {
         .spec = spec,
         .wi = wi,
-        .pdf = 1.0f
+        .pdf = 1.0f,
+        .specular = true,
     };
     // todo: allow for rough surfaces
 }
@@ -237,7 +238,8 @@ std::optional<BSDFSample> DielectricBxDF::sample(Vec3 wo, Sampler& sampler) cons
         return BSDFSample {
             .spec = spec_r,
             .wi = wi,
-            .pdf = r / (r + t)
+            .pdf = r / (r + t),
+            .specular = true
         };
     }
     else {
@@ -252,7 +254,8 @@ std::optional<BSDFSample> DielectricBxDF::sample(Vec3 wo, Sampler& sampler) cons
         return BSDFSample {
             .spec = spec_t,
             .wi = wi,
-            .pdf = t / (r + t)
+            .pdf = t / (r + t),
+            .specular = true
         };
     }
 }

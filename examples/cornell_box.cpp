@@ -13,24 +13,16 @@ int main() {
 
     auto light_spectrum = 
         spectra::ILLUM_D65();
-    // scene.add_light(
-    //     std::make_unique<PointLight>(
-    //         Pt3(0.0f, 1.5f, -5.0f),
-    //         light_spectrum,
-    //         3.0f
-    //     )
-    // );
     auto light_shape = std::make_unique<Quad>(
-        Pt3(-1.f, 1.9999f, -6.f),
-        Pt3(1.f, 1.9999f, -6.f),
-        Pt3(1.f, 1.9999f, -4.f),
-        Pt3(-1.f, 1.9999f, -4.f)
+        Pt3(-1.f, 1.9999f, -4.f),
+        Vec3(0.f, 0.f, -2.f),
+        Vec3(2.f, 0.f, 0.f)
     );
     scene.add_light(
         std::make_unique<AreaLight>(
             std::move(light_shape),
             light_spectrum,
-            4.0f,
+            16.0f,
             false
         )
     );

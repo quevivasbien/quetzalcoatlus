@@ -72,9 +72,7 @@ public:
         std::shared_ptr<const Spectrum> spectrum,
         float scale = 1.0f,
         bool two_sided = false
-    ) : Light(spectrum, scale, AREA), m_shape(std::move(shape)), m_two_sided(two_sided) {
-        m_area = m_shape->area();
-    }
+    ) : Light(spectrum, scale, AREA), m_shape(std::move(shape)), m_two_sided(two_sided) {}
 
     SpectrumSample total_emission(const WavelengthSample& wavelengths) const override;
 
@@ -89,5 +87,4 @@ public:
 private:
     std::unique_ptr<Shape> m_shape;
     bool m_two_sided;
-    float m_area;
 };

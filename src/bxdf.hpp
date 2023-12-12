@@ -11,7 +11,7 @@ struct BSDFSample {
     SpectrumSample spec;
     Vec3 wi;
     float pdf = 0.0f;
-    float ior = 1.0f;
+    bool specular = false;
 };
 
 
@@ -32,6 +32,8 @@ public:
 
     // hemispherical-hemispherical reflectance
     SpectrumSample reflectance(Sampler& sampler, size_t n_samples) const;
+
+    virtual bool is_specular() const { return false; }
 };
 
 // A wrapper around a BxDF that converts from world to local coordinates
@@ -52,6 +54,8 @@ public:
     SpectrumSample reflectance(Vec3 wo_render, Sampler& sampler, size_t n_samples) const;
 
     SpectrumSample reflectance(Sampler& sampler, size_t n_samples) const;
+
+    bool is_specular() const { return m_bxdf->is_specular(); }
 
     OrthonormalBasis m_basis;
     std::unique_ptr<BxDF> m_bxdf;
@@ -96,6 +100,8 @@ public:
     std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
     float pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const override;
 
+    bool is_specular() const override { return true; }
+
 private:
     float m_ior;
 };
@@ -108,6 +114,9 @@ public:
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
     std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
     float pdf(Vec3 wo, Vec3 wi, const Sampler& sampler) const override;
+
+    bool is_specular() const override { return true; }
+
 private:
     float m_ior;
 };
