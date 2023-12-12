@@ -40,6 +40,14 @@ public:
         return cos_theta * M_1_PI;
     }
 
+    // sample from a distribution on [0, 1] whose pdf is lerp(a, b, x)
+    // not that this is a nonlinear sample over [0, 1], *not* a uniform sample over [a, b]
+    float sample_linear(float a, float b);
+    float linear_pdf(float x, float a, float b);
+    // same idea as sample_linear, but for a bilinear patch
+    Vec2 sample_bilinear(const std::array<float, 4>& w);
+    float bilinear_pdf(const Vec2& uv, const std::array<float, 4>& w);
+
 protected:
     int m_samples_per_pixel;
 };

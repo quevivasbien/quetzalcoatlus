@@ -19,13 +19,6 @@
 
 RTCDevice initialize_device();
 
-enum ShapeType {
-    SPHERE,
-    TRIANGLE,
-    QUAD,
-    OBJ
-};
-
 struct GeometryData {
     ShapeType shape;
     const Material* material;
@@ -55,13 +48,13 @@ public:
     // methods for adding shapes to scene; return geometry ID
     // in cases where multiple points are required, they should be given in clockwise order around the outward face
 
-    unsigned int add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material, const Light* light = nullptr);
-    unsigned int add_sphere(const Pt3& center, float radius, const Material* material, const Light* light = nullptr);
-    unsigned int add_quad(const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d, const Material* material, const Light* light = nullptr);
+    GeometryData* add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material);
+    GeometryData* add_sphere(const Pt3& center, float radius, const Material* material);
+    GeometryData* add_quad(const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d, const Material* material);
     // plane is just a large square quad centered around the given point
-    unsigned int add_plane(const Pt3& p, const Vec3& n, const Material* material, const Light* light = nullptr, float half_size = 1000.0f);
+    GeometryData* add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
 
-    unsigned int add_obj(const std::string& filename, const Material* material, const Light* light = nullptr, const Transform& transform = Transform::identity());
+    GeometryData* add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
 
     // add a light to the scene
     void add_light(std::unique_ptr<Light>&& light);

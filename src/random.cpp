@@ -2,7 +2,7 @@
 #include <cstring>
 
 #include "random.hpp"
-
+#include "util.hpp"
 
 Vec2 Sampler::sample_uniform_disk() {
     Vec2 uv = sample_2d();
@@ -50,6 +50,38 @@ Vec3 Sampler::sample_cosine_hemisphere() {
     // project up to a hemisphere
     float z = std::sqrt(std::max(0.0f, 1.0f - d.x * d.x - d.y * d.y));
     return Vec3(d.x, d.y, z);
+}
+
+float Sampler::sample_linear(float a, float b) {
+    float u = sample_1d();
+    float x = u * (a + b) / (a + std::sqrt(lerp(a * a, b * b, u)));
+    return std::min(x, ONE_MINUS_EPS);
+}
+
+float Sampler::linear_pdf(float x, float a, float b) {
+    if (x < 0.0f || x > 1.0f) {
+        return 0.0f;
+    }
+    return 2.0f * lerp(a, b, x) / (a + b);
+}
+
+Vec2 Sampler::sample_bilinear(const std::array<float, 4>& w) {
+    float y = sample_linear(w[0] + w[1], w[2] + w[3]);
+    float x = sample_linear(lerp(w[0], w[2], y), lerp(w[1], w[3], y));
+    return Vec2(x, y);
+}
+
+float Sampler::bilinear_pdf(const Vec2& uv, const std::array<float, 4>& w) {
+    if (uv.x < 0.0f || uv.x > 1.0f || uv.y < 0.0f || uv.y > 1.0f) {
+        return 0.0f;
+    }
+    if (w[0] + w[1] + w[2] + w[3] == 0.0f) {
+        return 1.0f;
+    }
+    return 4.0f * (
+        (1.0f - uv.x) * (1.0f - uv.y) * w[0] + uv.x * (1 - uv.y) * w[1]
+        + (1.0f - uv.x) * uv.y * w[2] + uv.x * uv.y * w[3]
+    ) / (w[0] + w[1] + w[2] + w[3]);
 }
 
 
@@ -290,7 +322,7 @@ float radical_inv(int base_index, uint64_t a) {
         invBaseM *= invBase;
         a = next;
     }
-    return std::min(reversedDigits * invBaseM, float(0x1.fffffep-1));
+    return std::min(reversedDigits * invBaseM, ONE_MINUS_EPS);
 }
 
 float inv_radical_inv(uint64_t inverse, int base, int n_digits) {

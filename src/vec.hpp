@@ -20,6 +20,8 @@ public:
     const Vec3& operator+() const;
     Vec3 operator-() const;
 
+    bool operator==(const Vec3 &v2) const;
+
     // addition
     Vec3 operator+(const Vec3 &v2) const;
     Vec3& operator+=(const Vec3 &v2);
@@ -56,13 +58,6 @@ public:
 
     std::array<float, 4> to_homog() const;
     static Vec3 from_homog(const std::array<float, 4> &v);
-
-    // ray operations
-
-    Vec3 reflect(const Vec3 &normal) const;
-
-    // NOTE: assumes that this and normal are both unit vectors!
-    Vec3 refract(const Vec3 &normal, float ior_ratio) const;
 
     template <typename F>
     Vec3 map(F f) const {

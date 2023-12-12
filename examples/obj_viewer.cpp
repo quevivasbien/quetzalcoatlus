@@ -43,7 +43,7 @@ int main(int argc, const char* const argv[]) {
     //     nullptr, &light, 200
     // );
     scene.add_light(std::make_unique<PointLight>(
-        Transform::translation(0.0f, 3.0f, 5.0f),
+        Pt3(0.0f, 3.0f, 5.0f),
         spectra::ILLUM_D65(),
         10.0f
     ));

@@ -12,22 +12,28 @@ int main() {
     Scene scene(initialize_device());
 
     auto light_spectrum = 
-        std::make_shared<RGBIlluminantSpectrum>(RGB(6.0, 3.0, 3.0));
+        spectra::ILLUM_D65();
+    // scene.add_light(
+    //     std::make_unique<PointLight>(
+    //         Pt3(0.0f, 1.5f, -5.0f),
+    //         light_spectrum,
+    //         3.0f
+    //     )
+    // );
+    auto light_shape = std::make_unique<Quad>(
+        Pt3(-1.f, 1.9999f, -6.f),
+        Pt3(1.f, 1.9999f, -6.f),
+        Pt3(1.f, 1.9999f, -4.f),
+        Pt3(-1.f, 1.9999f, -4.f)
+    );
     scene.add_light(
-        std::make_unique<PointLight>(
-            Transform::translation(0.0f, 1.5f, -5.0f),
+        std::make_unique<AreaLight>(
+            std::move(light_shape),
             light_spectrum,
-            3.0f
+            4.0f,
+            false
         )
     );
-    // SimpleLight light(light_spectrum);
-    // scene.add_quad(
-    //     Pt3(-1.f, 1.9999f, -6.f),
-    //     Pt3(1.f, 1.9999f, -6.f),
-    //     Pt3(1.f, 1.9999f, -4.f),
-    //     Pt3(-1.f, 1.9999f, -4.f),
-    //     nullptr, &light
-    // );
 
     DiffuseMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
     scene.add_quad(

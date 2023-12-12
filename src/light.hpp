@@ -24,7 +24,7 @@ class Light {
 public:
     virtual ~Light() {}
 
-    Light(const Transform& render_from_light, std::shared_ptr<const Spectrum> spectrum, LightType type) : m_spectrum(spectrum), m_type(type), m_render_from_light(render_from_light) {}
+    Light(std::shared_ptr<const Spectrum> spectrum, float scale, LightType type) : m_spectrum(spectrum), m_scale(scale), m_type(type) {}
     
     virtual SpectrumSample total_emission(const WavelengthSample& wavelengths) const = 0;
 
@@ -48,33 +48,31 @@ public:
 
 protected:
     std::shared_ptr<const Spectrum> m_spectrum;
+    float m_scale;
     LightType m_type;
-    Transform m_render_from_light;
 };
 
 
 class PointLight : public Light {
 public:
-    PointLight(const Transform& render_from_light, std::shared_ptr<const Spectrum> spectrum, float scale = 1.0f) : Light(render_from_light, spectrum, POINT), m_scale(scale) {}
+    PointLight(const Pt3& point, std::shared_ptr<const Spectrum> spectrum, float scale = 1.0f) : Light(spectrum, scale, POINT), m_point(point) {}
 
     SpectrumSample total_emission(const WavelengthSample& wavelengths) const override;
 
     std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const override;
 
-private:
-    float m_scale;
+    Pt3 m_point;
 };
 
 
 class AreaLight : public Light {
 public:
     AreaLight(
-        const Transform& render_from_light,
         std::unique_ptr<Shape>&& shape,
         std::shared_ptr<const Spectrum> spectrum,
         float scale = 1.0f,
         bool two_sided = false
-    ) : Light(render_from_light, spectrum, AREA), m_shape(std::move(shape)), m_scale(scale), m_two_sided(two_sided) {
+    ) : Light(spectrum, scale, AREA), m_shape(std::move(shape)), m_two_sided(two_sided) {
         m_area = m_shape->area();
     }
 
@@ -84,9 +82,12 @@ public:
     float pdf(const Pt3& p, const Vec3& wi) const override;
     SpectrumSample emission(const Pt3& p, const Vec3& n, const Vec3& w, const WavelengthSample& wavelengths) const override;
 
+    const Shape* shape() const {
+        return m_shape.get();
+    }
+
 private:
     std::unique_ptr<Shape> m_shape;
-    float m_scale;
     bool m_two_sided;
     float m_area;
 };

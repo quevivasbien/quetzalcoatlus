@@ -6,6 +6,7 @@
 #include "rgb_to_spectrum_opt.hpp"
 #include "rgb.hpp"
 #include "spectra.hpp"
+#include "util.hpp"
 
 const size_t SPECTRUM_TABLE_RES = 32;
 
@@ -72,10 +73,6 @@ float RGBSigmoidPolynomial::max_value() const {
         result = std::max(result, (*this)(lambda));
     }
     return result;
-}
-
-float lerp(float a, float b, float t) {
-    return a * (1.0f - t) + b * t;
 }
 
 RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB& rgb) const {

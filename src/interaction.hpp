@@ -29,12 +29,12 @@ struct SurfaceInteraction : public Interaction {
         return material->bsdf(*this, wavelengths);
     }
 
-    // SpectrumSample emission(const Vec3 wo, const WavelengthSample& wavelengths) const {
-    //     if (!light) {
-    //         return SpectrumSample(0.0f);
-    //     }
-    //     return light->emission(*this, wo, wavelengths);
-    // }
+    SpectrumSample emission(const Vec3 w, const WavelengthSample& wavelengths) const {
+        if (!light) {
+            return SpectrumSample(0.0f);
+        }
+        return light->emission(this->point, this->normal, w, wavelengths);
+    }
 
     Ray skip_intersection(const Ray& ray) const {
         return Ray(point, ray.d);

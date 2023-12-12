@@ -10,14 +10,14 @@
 int main() {
     Scene scene(initialize_device());
 
-    SimpleLight light(std::make_shared<RGBIlluminantSpectrum>(RGB(8., 4., 4.)));
-    scene.add_quad(
-        Pt3(-2.f, 5.f, -7.f),
-        Pt3(2.f, 5.f, -7.f),
-        Pt3(2.f, 3.f, 1.f),
-        Pt3(-2.f, 3.f, 1.f),
-        nullptr, &light
-    );
+    // SimpleLight light(std::make_shared<RGBIlluminantSpectrum>(RGB(8., 4., 4.)));
+    // scene.add_quad(
+    //     Pt3(-2.f, 5.f, -7.f),
+    //     Pt3(2.f, 5.f, -7.f),
+    //     Pt3(2.f, 3.f, 1.f),
+    //     Pt3(-2.f, 3.f, 1.f),
+    //     nullptr, &light
+    // );
 
     // demonstrate dummy texture
     DiffuseMaterial dummy(DummyTexture{});

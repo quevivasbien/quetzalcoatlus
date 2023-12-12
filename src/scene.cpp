@@ -118,7 +118,7 @@ bool Scene::occluded(Pt3 start, Pt3 end) const {
     return rayhit.ray.tfar <= 1.0f;
 }
 
-unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material, const Light* light) {
+GeometryData* Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material) {
     RTCGeometry geom = rtcNewGeometry(
         m_device,
         RTC_GEOMETRY_TYPE_TRIANGLE
@@ -152,23 +152,23 @@ unsigned int Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const
     else {
         printf("Something went wrong when making triangle\n");
     }
-    m_geom_data.push_back({ ShapeType::TRIANGLE, material, light });
-    rtcSetGeometryUserData(geom, &m_geom_data.back());
+    m_geom_data.push_back({ ShapeType::TRIANGLE, material });
+    GeometryData* geom_data = &m_geom_data.back();
+    rtcSetGeometryUserData(geom, geom_data);
 
     rtcCommitGeometry(geom);
-    unsigned int geom_id = rtcAttachGeometry(m_scene, geom);
+    rtcAttachGeometry(m_scene, geom);
     rtcReleaseGeometry(geom);
 
-    return geom_id;
+    return geom_data;
 }
 
-unsigned int Scene::add_quad(
+GeometryData* Scene::add_quad(
     const Pt3& a,
     const Pt3& b,
     const Pt3& c,
     const Pt3& d,
-    const Material* material,
-    const Light* light
+    const Material* material
 ) {
     RTCGeometry geom = rtcNewGeometry(
         m_device,
@@ -205,19 +205,18 @@ unsigned int Scene::add_quad(
     else {
         printf("Something went wrong when making quad\n");
     }
-    m_geom_data.push_back({ ShapeType::QUAD, material, light });
-    rtcSetGeometryUserData(geom, &m_geom_data.back());
+    m_geom_data.push_back({ ShapeType::QUAD, material });
+    GeometryData* geom_data = &m_geom_data.back();
+    rtcSetGeometryUserData(geom, geom_data);
 
     rtcCommitGeometry(geom);
-    unsigned int geom_id = rtcAttachGeometry(m_scene, geom);
+    rtcAttachGeometry(m_scene, geom);
     rtcReleaseGeometry(geom);
 
-    auto x = get_geom_data(geom_id);
-
-    return geom_id;
+    return geom_data;
 }
 
-unsigned int Scene::add_plane(const Pt3& p, const Vec3& n, const Material* material, const Light* light, float half_size) {
+GeometryData* Scene::add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size) {
     // plane will be modeled as a large quad centered around the given point
     
     OrthonormalBasis basis(n);
@@ -226,10 +225,10 @@ unsigned int Scene::add_plane(const Pt3& p, const Vec3& n, const Material* mater
     Pt3 c = p + basis.u[0] * half_size + basis.u[1] * half_size;
     Pt3 d = p - basis.u[0] * half_size + basis.u[1] * half_size;
     
-    return add_quad(a, b, c, d, material, light); 
+    return add_quad(a, b, c, d, material); 
 }
 
-unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* material, const Light* light) {
+GeometryData* Scene::add_sphere(const Pt3& center, float radius, const Material* material) {
     RTCGeometry geom = rtcNewGeometry(
         m_device,
         RTC_GEOMETRY_TYPE_SPHERE_POINT
@@ -252,17 +251,18 @@ unsigned int Scene::add_sphere(const Pt3& center, float radius, const Material* 
     else {
         printf("Something went wrong when making sphere\n");
     }
-    m_geom_data.push_back({ ShapeType::SPHERE, material, light });
-    rtcSetGeometryUserData(geom, &m_geom_data.back());
+    m_geom_data.push_back({ ShapeType::SPHERE, material });
+    GeometryData* geom_data = &m_geom_data.back();
+    rtcSetGeometryUserData(geom, geom_data);
 
     rtcCommitGeometry(geom);
-    unsigned int geom_id = rtcAttachGeometry(m_scene, geom);
+    rtcAttachGeometry(m_scene, geom);
     rtcReleaseGeometry(geom);
 
-    return geom_id;
+    return geom_data;
 }
 
-unsigned int Scene::add_obj(const std::string& filename, const Material* material, const Light* light, const Transform& transform) {
+GeometryData* Scene::add_obj(const std::string& filename, const Material* material, const Transform& transform) {
     // for now, only supports triangle meshes
     std::vector<Pt3> vertices;
     std::vector<std::array<unsigned int, 3>> faces;
@@ -270,7 +270,7 @@ unsigned int Scene::add_obj(const std::string& filename, const Material* materia
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cout << "Unable to open file" << std::endl;
-        return RTC_INVALID_GEOMETRY_ID;
+        return nullptr;
     }
     std::string line;
     while (std::getline(file, line)) {
@@ -348,16 +348,40 @@ unsigned int Scene::add_obj(const std::string& filename, const Material* materia
         printf("Something went wrong when making obj\n");
     }
 
-    m_geom_data.push_back({ ShapeType::OBJ, material, light });
-    rtcSetGeometryUserData(geom, &m_geom_data.back());
+    m_geom_data.push_back({ ShapeType::OBJ, material });
+    GeometryData* geom_data = &m_geom_data.back();
+    rtcSetGeometryUserData(geom, geom_data);
 
     rtcCommitGeometry(geom);
-    unsigned int geom_id = rtcAttachGeometry(m_scene, geom);
+    rtcAttachGeometry(m_scene, geom);
     rtcReleaseGeometry(geom);
 
-    return geom_id;
+    return geom_data;
 }
 
-void Scene::add_light(std::unique_ptr<Light>&& light) {
+void Scene::add_light(std::unique_ptr<Light>&& light) { 
+    if (light->type() == LightType::AREA) {
+        // add the light's geometry to the scene
+        const Shape* shape = static_cast<const AreaLight*>(light.get())->shape();
+        auto shape_type = shape->type();
+        if (shape_type == ShapeType::SPHERE) {
+            const Sphere* sphere = static_cast<const Sphere*>(shape);
+            auto geom_data = add_sphere(sphere->m_center, sphere->m_radius, nullptr);
+            if (geom_data) {
+                geom_data->light = light.get();
+            }
+        }
+        else if (shape_type == ShapeType::QUAD) {
+            const Quad* quad = static_cast<const Quad*>(shape);
+            auto [a, b, c, d] = quad->get_vertices();
+            auto geom_data = add_quad(a, b, c, d, nullptr);
+            if (geom_data) {
+                geom_data->light = light.get();
+            }
+        }
+        else {
+            std::cout << "Shape type not yet supported as an area light: " << shape->type() << std::endl;
+        }
+    }
     m_lights.push_back(std::move(light));
 }
