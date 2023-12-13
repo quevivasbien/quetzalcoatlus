@@ -93,6 +93,7 @@ private:
 class RGBIlluminantSpectrum : public Spectrum {
 public:
     explicit RGBIlluminantSpectrum(RGB rgb, const RGBColorSpace& cs = *RGBColorSpace::sRGB());
+    RGBIlluminantSpectrum(float r, float g, float b, const RGBColorSpace& cs = *RGBColorSpace::sRGB());
 
     float operator()(float lambda) const override;
 

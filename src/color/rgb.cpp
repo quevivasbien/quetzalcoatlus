@@ -186,6 +186,8 @@ RGBIlluminantSpectrum::RGBIlluminantSpectrum(
     m_polynomial = cs.to_spectrum(rgb_);
 }
 
+RGBIlluminantSpectrum::RGBIlluminantSpectrum(float r, float g, float b, const RGBColorSpace& cs) : RGBIlluminantSpectrum(RGB(r, g, b), cs) {}
+
 float RGBIlluminantSpectrum::operator()(float lambda) const {
     if (!m_illuminant) {
         return 0.0f;

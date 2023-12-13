@@ -72,13 +72,10 @@ int main() {
         Pt3(-0.8f, -1.25f, -4.4f), 0.75f,
         &dielectric
     );
-    ConductiveMaterial conductor(
-        std::make_shared<RGBUnboundedSpectrum>(RGB(0.8f, 1.2f, 1.8f)),
-        std::make_shared<RGBUnboundedSpectrum>(RGB(1.0f, 4.0f, 6.0f))
-    );
+    auto metal = ConductiveMaterial::copper();
     scene.add_sphere(
         Pt3(0.6f, -1.0f, -5.5f), 1.0f,
-        &conductor
+        &metal
     );
     
     scene.commit();
@@ -86,7 +83,7 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 16;
+    size_t n_samples = 128;
     size_t max_bounces = 64;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<

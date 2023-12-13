@@ -8,18 +8,15 @@
 int main() {
     Scene scene(initialize_device());
 
-    // SimpleLight light(
-    //     std::make_shared<RGBIlluminantSpectrum>(RGB(2.6, 0.8, 1.2))
-    // );
-    // scene.add_plane(
-    //     Pt3(0., 0., 5.),
-    //     Vec3(-1., 0., -1.).normalize(),
-    //     nullptr, &light
-    // );
+    scene.add_light(std::make_unique<PointLight>(
+        Pt3(-2., 0., 1.),
+        std::make_shared<RGBIlluminantSpectrum>(RGB(6.0, 2.0, 4.0)),
+        100.0f
+    ));
 
-    ConductiveMaterial right_plane(
-        std::make_shared<ConstantSpectrum>(1.2),
-        std::make_shared<RGBUnboundedSpectrum>(RGB(221. / 255., 15. / 255., 110. / 255.))
+    auto right_plane = MixedMaterial<2>(
+        {std::make_unique<ConductiveMaterial>(ConductiveMaterial::copper()), std::make_unique<DiffuseMaterial>(SolidColor(221. / 255., 15. / 255., 110. / 255.))},
+        {0.9, 0.1}
     );
     scene.add_plane(
         Pt3(0., 0., -10.),
@@ -27,9 +24,9 @@ int main() {
         &right_plane
     );
 
-    ConductiveMaterial left_plane(
-        std::make_shared<ConstantSpectrum>(1.2),
-        std::make_shared<RGBUnboundedSpectrum>(RGB(19. / 255., 70. / 255., 180. / 255.))
+    auto left_plane = MixedMaterial<2>(
+        {std::make_unique<ConductiveMaterial>(ConductiveMaterial::alluminum()), std::make_unique<DiffuseMaterial>(SolidColor(19. / 255., 70. / 255., 180. / 255.))},
+        {0.9, 0.1}
     );
     scene.add_plane(
         Pt3(0., 0., -10.),
@@ -37,7 +34,8 @@ int main() {
         &left_plane
     );
 
-    DielectricMaterial sphere(1.2);
+    DielectricMaterial sphere(spectra::GLASS_SF11_IOR());
+    // DiffuseMaterial sphere(SolidColor(0.8, 0.8, 0.8));
     scene.add_sphere(
         Pt3(1., 1., -5.), 0.8,
         &sphere
@@ -68,6 +66,7 @@ int main() {
         "ms" << std::endl;
 
     result.save("opposing_planes_no_denoise.png");
+    result.save_albedo("opposing_planes_albedo.png");
     result.denoise();
     result.save("opposing_planes.png");
 

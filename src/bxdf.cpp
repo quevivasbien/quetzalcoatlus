@@ -259,10 +259,11 @@ std::optional<BSDFSample> DielectricBxDF::sample(Vec3 wo, Sampler& sampler) cons
             .spec = spec_t,
             .wi = wi,
             .pdf = t / (r + t),
+            .ior = ior_p,
             .scatter_type = ScatterType {
                 .specular = true,
                 .transmission = true
-            }
+            },
         };
     }
 }

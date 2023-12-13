@@ -47,8 +47,14 @@ int main(int argc, const char* const argv[]) {
         8.0f
     ));
 
-    DiffuseMaterial material(SolidColor(1.0, 6.0, 1.0));
-    // DielectricMaterial material(std::make_shared<RGBUnboundedSpectrum>(1.2, 1.4, 3.0));
+    std::array<std::unique_ptr<Material>, 2> materials = {
+        std::make_unique<DiffuseMaterial>(SolidColor(1.0, 1.0, 1.0)),
+        std::make_unique<ConductiveMaterial>(ConductiveMaterial::copper())
+    };
+    std::array<float, 2> weights = {0.25, 0.75};
+    MixedMaterial material(
+        std::move(materials), std::move(weights)
+    );
     scene.add_obj(filename, &material);
 
     DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));
@@ -74,7 +80,7 @@ int main(int argc, const char* const argv[]) {
         1920, 1080, M_PI / 3.0,
         camera_t
     );
-    size_t n_samples = 16;
+    size_t n_samples = 32;
     size_t max_bounces = 64;
 
     auto result = render(camera, scene, n_samples, max_bounces);

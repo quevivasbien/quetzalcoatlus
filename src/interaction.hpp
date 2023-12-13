@@ -26,7 +26,7 @@ struct SurfaceInteraction : public Interaction {
         if (!material) {
             return std::nullopt;
         }
-        return material->bsdf(*this, wavelengths);
+        return material->bsdf(*this, wavelengths, sampler);
     }
 
     SpectrumSample emission(const Vec3 w, const WavelengthSample& wavelengths) const {
