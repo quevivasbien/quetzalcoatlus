@@ -190,3 +190,11 @@ Vec2& Vec2::operator/=(float t) {
 Vec2 operator*(float t, const Vec2& v) {
     return v * t;
 }
+
+float Vec2::norm_squared() const {
+    return x * x + y * y;
+}
+
+float Vec2::norm() const {
+    return std::sqrt(x * x + y * y);
+}

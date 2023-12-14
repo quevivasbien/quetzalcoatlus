@@ -36,22 +36,27 @@ int main(int argc, const char* const argv[]) {
 
     Scene scene(initialize_device());
 
-    auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 2.0, 3.0));
-    scene.add_light(std::make_unique<AreaLight>(
-        std::make_unique<Quad>(
-            Pt3(4.f, 6.f, 8.f),
-            Vec3(2.f, 0.f, -2.f),
-            Vec3(0.f, 3.f, -3.f)
-        ),
+    auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0));
+    // scene.add_light(std::make_unique<AreaLight>(
+    //     std::make_unique<Quad>(
+    //         Pt3(4.f, 6.f, 8.f),
+    //         Vec3(2.f, 0.f, -2.f),
+    //         Vec3(0.f, 3.f, -3.f)
+    //     ),
+    //     light_spectrum,
+    //     8.0f
+    // ));
+    scene.add_light(std::make_unique<PointLight>(
+        Pt3(4., 6., 8.),
         light_spectrum,
-        8.0f
+        50.0f
     ));
 
     std::array<std::unique_ptr<Material>, 2> materials = {
-        std::make_unique<DiffuseMaterial>(SolidColor(1.0, 1.0, 1.0)),
-        std::make_unique<ConductiveMaterial>(ConductiveMaterial::copper())
+        std::make_unique<DiffuseMaterial>(SolidColor(1.0, 0.6, 1.0)),
+        std::make_unique<ConductiveMaterial>(ConductiveMaterial::copper(0.05, 0.2))
     };
-    std::array<float, 2> weights = {0.25, 0.75};
+    std::array<float, 2> weights = {0.1, 0.9};
     MixedMaterial material(
         std::move(materials), std::move(weights)
     );
@@ -77,7 +82,7 @@ int main(int argc, const char* const argv[]) {
         * Transform::rotate_y(camera_rotation.y)
         * Transform::rotate_z(camera_rotation.z);
     Camera camera(
-        1920, 1080, M_PI / 3.0,
+        1920 / 4, 1080 / 4, M_PI / 3.0,
         camera_t
     );
     size_t n_samples = 32;

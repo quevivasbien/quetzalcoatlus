@@ -3,6 +3,7 @@
 #include <complex>
 
 #include "bxdf.hpp"
+#include "util.hpp"
 
 // utility functions for directions in hemispherical coordinate system
 float cos_theta(Vec3 w) {
@@ -31,6 +32,16 @@ float tan_theta(Vec3 w) {
 
 float tan2_theta(Vec3 w) {
     return sin2_theta(w) / cos2_theta(w);
+}
+
+float cos_phi(Vec3 w) {
+    float sin_theta_ = sin_theta(w);
+    return (sin_theta_ == 0.0f) ? 1.0f : std::clamp(w.x / sin_theta_, -1.0f, 1.0f);
+}
+
+float sin_phi(Vec3 w) {
+    float sin_theta_ = sin_theta(w);
+    return (sin_theta_ == 0.0f) ? 0.0f : std::clamp(w.y / sin_theta_, -1.0f, 1.0f);
 }
 
 
@@ -197,32 +208,125 @@ SpectrumSample dialectric_reflectance(float cos_theta_i, const SpectrumSample& i
 }
 
 
+float TrowbridgeReitzDistribution::operator()(Vec3 wm) const {
+    float tan2_theta_ = tan2_theta(wm);
+    if (std::isinf(tan2_theta_)) {
+        return 0.0f;
+    }
+    float cos4_theta = std::pow(cos2_theta(wm), 2);
+    float e = tan2_theta_ * (
+        std::pow(cos_phi(wm) / m_alpha_x, 2)
+        + std::pow(sin_phi(wm) / m_alpha_y, 2)
+    );
+    return 1.0f / (M_PI * m_alpha_x * m_alpha_y * cos4_theta * (1.0f + e) * (1.0f + e));
+}
+
+float TrowbridgeReitzDistribution::operator()(Vec3 w, Vec3 wm) const {
+    return masking(w) / std::abs(cos_theta(w) * (*this)(wm) * std::abs(w.dot(wm)));
+}
+
+bool TrowbridgeReitzDistribution::is_smooth() const {
+    return m_alpha_x < 1e-3f && m_alpha_y < 1e-3f; 
+}
+
+float TrowbridgeReitzDistribution::lambda(Vec3 w) const {
+    float tan2_theta_ = tan2_theta(w);
+    if (std::isinf(tan2_theta_)) {
+        return 0.0f;
+    }
+    float alpha2 = std::pow(cos_phi(w) * m_alpha_x, 2) + std::pow(sin_phi(w) * m_alpha_y, 2);
+    return (std::sqrt(1.0f + alpha2 * tan2_theta_) - 1.0f) / 2.0f;
+}
+
+float TrowbridgeReitzDistribution::masking(Vec3 w) const {
+    return 1.0f / (1.0f + lambda(w));
+}
+
+float TrowbridgeReitzDistribution::masking_shadowing(Vec3 wo, Vec3 wi) const {
+    return 1.0f / (1.0f + lambda(wo) + lambda(wi));
+}
+
+Vec3 TrowbridgeReitzDistribution::sample(Vec3 w, Sampler& sampler) const {
+    Vec3 wh = Vec3(m_alpha_x * w.x, m_alpha_y * w.y, w.z).normalize();
+    if (wh.z < 0.0f) {
+        wh = -wh;
+    }
+    Vec3 t1 = wh.z < 0.9999f ? Vec3(0.0f, 0.0f, 1.0f).cross(wh).normalize() : Vec3(1.0f, 0.0f, 0.0f);
+    Vec3 t2 = wh.cross(t1);
+    Vec2 p = sampler.sample_uniform_disk_polar();
+    float h = std::sqrt(1.0f - p.x * p.x);
+    p.y = lerp((1.0 + wh.z) * 0.5f, h, p.y);
+    float pz = std::sqrt(std::max(0.0f, 1.0f - p.norm_squared()));
+    Vec3 nh = p.x * t1 + p.y * t2 + pz * wh;
+    return Vec3(
+        m_alpha_x * nh.x,
+        m_alpha_y * nh.y,
+        std::max(1e-6f, nh.z)
+    ).normalize();
+}
+
 
 SpectrumSample ConductorBxDF::operator()(Vec3 wo, Vec3 wi) const {
-    // if (wo.z * wi.z <= 0.0f) {
-    //     return SpectrumSample(0.0f);
-    // }
-    return SpectrumSample(0.0f);
-    // todo: allow for rough surfaces
+    if (wo.z * wi.z <= 0.0f || m_roughness.is_smooth()) {
+        return SpectrumSample(0.0f);
+    }
+    float cos_theta_o = std::abs(cos_theta(wo));
+    float cos_theta_i = std::abs(cos_theta(wi));
+    if (cos_theta_i == 0.0f || cos_theta_o == 0.0f) {
+        return SpectrumSample(0.0f);
+    }
+    Vec3 wm = wi + wo;
+    if (wm.norm_squared() == 0.0f) {
+        return SpectrumSample(0.0f);
+    }
+    wm = wm.normalize();
+    auto fresnel_factor = dialectric_reflectance(std::abs(wo.dot(wm)), m_ior, m_absorption);
+    return fresnel_factor * (m_roughness(wm) * m_roughness.masking_shadowing(wo, wi) / (4.0f * cos_theta_i * cos_theta_o));
 }
 
 std::optional<BSDFSample> ConductorBxDF::sample(Vec3 wo, Sampler& sampler) const {
-    Vec3 wi(-wo.x, -wo.y, wo.z);
-    auto spec = dialectric_reflectance(abs_cos_theta(wi), m_ior, m_absorption) / abs_cos_theta(wi);
+    if (m_roughness.is_smooth()) {
+        Vec3 wi(-wo.x, -wo.y, wo.z);
+        auto spec = dialectric_reflectance(abs_cos_theta(wi), m_ior, m_absorption) / abs_cos_theta(wi);
+        return BSDFSample {
+            .spec = spec,
+            .wi = wi,
+            .pdf = 1.0f,
+            .scatter_type = ScatterType {
+                .specular = true
+            },
+        };
+    }
+    Vec3 wm = m_roughness.sample(wo, sampler);
+    Vec3 wi = reflect(wo, wm);
+    if (wo.dot(wi) <= 0.0f) {
+        return std::nullopt;
+    }
+    float pdf_ = m_roughness(wo, wm)  / (4.0f * std::abs(wo.dot(wm)));
+    float cos_theta_o = std::abs(cos_theta(wo));
+    float cos_theta_i = std::abs(cos_theta(wi));
+    auto fresnel_factor = dialectric_reflectance(std::abs(wo.dot(wm)), m_ior, m_absorption);
+    auto spec = fresnel_factor * (m_roughness(wm) * m_roughness.masking_shadowing(wo, wi) / (4.0f * cos_theta_i * cos_theta_o));
     return BSDFSample {
         .spec = spec,
         .wi = wi,
-        .pdf = 1.0f,
+        .pdf = pdf_,
         .scatter_type = ScatterType {
-            .transmission = true
-        },
+            .specular = true,
+        }
     };
-    // todo: allow for rough surfaces
 }
 
 float ConductorBxDF::pdf(Vec3 wo, Vec3 wi) const {
-    return 0.0f;
-    // todo: allow for rough surfaces
+    if (wo.z * wi.z <= 0.0f || m_roughness.is_smooth()) {
+        return 0.0f;
+    }
+    auto wm = wo + wi;
+    if (wm.norm_squared() == 0.0f) {
+        return 0.0f;
+    }
+    wm = wm.dot(Vec3(0.0f, 0.0f, 1.0f)) > 0.0f ? wm.normalize() : -wm.normalize();
+    return m_roughness(wo, wm) / (4.0f * std::abs(wo.dot(wm))); 
 }
 
 

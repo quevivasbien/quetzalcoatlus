@@ -15,21 +15,23 @@ BSDF ConductiveMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wa
 
     return BSDF(
         si.normal,
-        std::make_unique<ConductorBxDF>(std::move(ior), std::move(absorption))
+        std::make_unique<ConductorBxDF>(std::move(ior), std::move(absorption), m_roughness)
     );
 }
 
-ConductiveMaterial ConductiveMaterial::alluminum() {
+ConductiveMaterial ConductiveMaterial::alluminum(float roughness_a, float roughness_b) {
     return ConductiveMaterial(
         spectra::AL_IOR(),
-        spectra::AL_ABSORPTION()
+        spectra::AL_ABSORPTION(),
+        TrowbridgeReitzDistribution(roughness_a, roughness_b)
     );
 }
 
-ConductiveMaterial ConductiveMaterial::copper() {
+ConductiveMaterial ConductiveMaterial::copper(float roughness_a, float roughness_b) {
     return ConductiveMaterial(
         spectra::CU_IOR(),
-        spectra::CU_ABSORPTION()
+        spectra::CU_ABSORPTION(),
+        TrowbridgeReitzDistribution(roughness_a, roughness_b)
     );
 }
 

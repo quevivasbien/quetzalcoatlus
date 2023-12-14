@@ -9,25 +9,33 @@ int main() {
     Scene scene(initialize_device());
 
     scene.add_light(std::make_unique<PointLight>(
-        Pt3(-2., 0., 1.),
-        std::make_shared<RGBIlluminantSpectrum>(RGB(6.0, 2.0, 4.0)),
-        100.0f
+        Pt3(-2., -1., 1.),
+        std::make_shared<RGBIlluminantSpectrum>(RGB(6.0, 0.2, 0.2)),
+        20.0f
     ));
+    scene.add_light(std::make_unique<PointLight>(
+        Pt3(-2., 1., 1.),
+        std::make_shared<RGBIlluminantSpectrum>(RGB(0.2, 0.2, 6.0)),
+        20.0f
+    ));
+    // scene.add_light(std::make_unique<AreaLight>(
+    //     std::make_unique<Quad>(
+    //         Pt3(-8, -4, 4),
+    //         Vec3(0, 8, 2),
+    //         Vec3(8, 0, 0)
+    //     ),
+    //     std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0)),
+    //     1.0f
+    // ));
 
-    auto right_plane = MixedMaterial<2>(
-        {std::make_unique<ConductiveMaterial>(ConductiveMaterial::copper()), std::make_unique<DiffuseMaterial>(SolidColor(221. / 255., 15. / 255., 110. / 255.))},
-        {0.9, 0.1}
-    );
+    auto right_plane = ConductiveMaterial::copper(0.4, 0.2);
     scene.add_plane(
         Pt3(0., 0., -10.),
         Vec3(-0.5, 0.5, 1.).normalize(),
         &right_plane
     );
 
-    auto left_plane = MixedMaterial<2>(
-        {std::make_unique<ConductiveMaterial>(ConductiveMaterial::alluminum()), std::make_unique<DiffuseMaterial>(SolidColor(19. / 255., 70. / 255., 180. / 255.))},
-        {0.9, 0.1}
-    );
+    auto left_plane = ConductiveMaterial::alluminum(0.3, 0.6);
     scene.add_plane(
         Pt3(0., 0., -10.),
         Vec3(0.5, -0.5, 1.).normalize(),
@@ -35,7 +43,6 @@ int main() {
     );
 
     DielectricMaterial sphere(spectra::GLASS_SF11_IOR());
-    // DiffuseMaterial sphere(SolidColor(0.8, 0.8, 0.8));
     scene.add_sphere(
         Pt3(1., 1., -5.), 0.8,
         &sphere

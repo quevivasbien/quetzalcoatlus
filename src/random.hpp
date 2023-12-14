@@ -27,6 +27,7 @@ public:
     }
 
     Vec2 sample_uniform_disk();
+    Vec2 sample_uniform_disk_polar();
     Vec3 sample_uniform_hemisphere();
     static float uniform_hemisphere_pdf() {
         return 0.5 * M_1_PI;

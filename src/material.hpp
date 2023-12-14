@@ -34,17 +34,22 @@ public:
 
 class ConductiveMaterial : public Material {
 public:
-    ConductiveMaterial(float ior, float absorption) : m_ior(std::make_shared<ConstantSpectrum>(ior)), m_absorption(std::make_shared<ConstantSpectrum>(absorption)) {}
+    ConductiveMaterial(float ior, float absorption) : m_ior(std::make_shared<ConstantSpectrum>(ior)), m_absorption(std::make_shared<ConstantSpectrum>(absorption)), m_roughness(0.0f, 0.0f) {}
 
-    ConductiveMaterial(std::shared_ptr<const Spectrum> ior, std::shared_ptr<const Spectrum> absorption) : m_ior(ior), m_absorption(absorption) {}
+    ConductiveMaterial(
+        std::shared_ptr<const Spectrum> ior,
+        std::shared_ptr<const Spectrum> absorption,
+        TrowbridgeReitzDistribution roughness = TrowbridgeReitzDistribution(0.0f, 0.0f)
+    ) : m_ior(ior), m_absorption(absorption), m_roughness(roughness) {}
 
     BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const override;
 
-    static ConductiveMaterial alluminum();
-    static ConductiveMaterial copper();
+    static ConductiveMaterial alluminum(float roughness_a = 0.0f, float roughness_b = 0.0f);
+    static ConductiveMaterial copper(float roughness_a = 0.0f, float roughness_b = 0.0f);
 
     std::shared_ptr<const Spectrum> m_ior;
     std::shared_ptr<const Spectrum> m_absorption;
+    TrowbridgeReitzDistribution m_roughness;
 };
 
 

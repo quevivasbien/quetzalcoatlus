@@ -22,6 +22,13 @@ Vec2 Sampler::sample_uniform_disk() {
     return Vec2(r * std::cos(theta), r * std::sin(theta));
 }
 
+Vec2 Sampler::sample_uniform_disk_polar() {
+    Vec2 uv = sample_2d();
+    float r = std::sqrt(uv.x);
+    float theta = M_2_PI * uv.y;
+    return Vec2(r * std::cos(theta), r * std::sin(theta));
+}
+
 Vec3 Sampler::sample_uniform_hemisphere() {
     Vec2 uv = sample_2d();
     float z = uv.x;

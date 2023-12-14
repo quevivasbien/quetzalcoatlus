@@ -83,11 +83,35 @@ private:
     SpectrumSample m_reflectance;
 };
 
+// represents microgeometry (roughness) of a surface
+struct TrowbridgeReitzDistribution {
+    TrowbridgeReitzDistribution(float alpha_x, float alpha_y) : m_alpha_x(alpha_x), m_alpha_y(alpha_y) {}
+
+    float operator()(Vec3 wm) const;
+    float operator()(Vec3 w, Vec3 wm) const;
+    
+    Vec3 sample(Vec3 w, Sampler& sampler) const;
+
+    bool is_smooth() const;
+
+    float m_alpha_x;
+    float m_alpha_y;
+
+    float masking(Vec3 w) const;
+    float masking_shadowing(Vec3 wo, Vec3 wi) const;
+
+private:
+    float lambda(Vec3 w) const;
+};
 
 class ConductorBxDF : public BxDF {
 public:
-    ConductorBxDF(float ior, float absorption) : m_ior(ior), m_absorption(absorption) {}
-    ConductorBxDF(const SpectrumSample& ior, const SpectrumSample& absorption) : m_ior(ior), m_absorption(absorption) {}
+    ConductorBxDF(float ior, float absorption, float roughness = 0.0f) : m_ior(ior), m_absorption(absorption), m_roughness(roughness, roughness) {}
+    ConductorBxDF(
+        const SpectrumSample& ior,
+        const SpectrumSample& absorption,
+        const TrowbridgeReitzDistribution& roughness = TrowbridgeReitzDistribution(0.0f, 0.0f)
+    ) : m_ior(ior), m_absorption(absorption), m_roughness(roughness) {}
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
     std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
@@ -96,6 +120,7 @@ public:
 private:
     SpectrumSample m_ior;
     SpectrumSample m_absorption;
+    TrowbridgeReitzDistribution m_roughness;
 };
 
 

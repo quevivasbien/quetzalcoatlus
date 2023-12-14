@@ -111,6 +111,9 @@ public:
 
     Vec2 operator/(float t) const;
     Vec2& operator/=(float t);
+
+    float norm_squared() const;
+    float norm() const;
 };
 
 Vec2 operator*(float t, const Vec2 &v);
