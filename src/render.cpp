@@ -105,11 +105,14 @@ PixelSample sample_pixel(
         auto si = scene.ray_intersect(ray, wavelengths, sampler);
         // no intersection, add background and break
         if (!si) {
+            // ConstantSpectrum spec(1.);
+            // pxs.color += weight * SpectrumSample::from_spectrum(spec, wavelengths);
             break;
         }
         if (depth == 0) {
             pxs.normal = si->normal;
         }
+        // add emitted light if intersected object is an area light
         auto emitted = si->emission(-ray.d, wavelengths);
         if (!emitted.is_zero()) {
             if (depth == 0 || specular_bounce) {

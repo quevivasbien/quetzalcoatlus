@@ -207,6 +207,12 @@ SpectrumSample dielectric_reflectance(float cos_theta_i, const SpectrumSample& i
     return SpectrumSample(std::move(ss));
 }
 
+TrowbridgeReitzDistribution::TrowbridgeReitzDistribution(float alpha_x, float alpha_y) : m_alpha_x(alpha_x), m_alpha_y(alpha_y) {
+    if (!is_smooth() && (alpha_x == 0. || alpha_y == 0.)) {
+        m_alpha_x = std::max(1e-5f, alpha_x);
+        m_alpha_y = std::max(1e-5f, alpha_y);
+    }
+}
 
 float TrowbridgeReitzDistribution::operator()(Vec3 wm) const {
     float tan2_theta_ = tan2_theta(wm);
@@ -300,7 +306,7 @@ std::optional<BSDFSample> ConductorBxDF::sample(Vec3 wo, float sample1, Vec2 sam
     }
     Vec3 wm = m_roughness.sample(wo, sample2);
     Vec3 wi = reflect(wo, wm);
-    if (wo.dot(wi) <= 0.0f) {
+    if (wo.z * wi.z <= 0.0f) {
         return std::nullopt;
     }
     float pdf_ = m_roughness(wo, wm)  / (4.0f * std::abs(wo.dot(wm)));

@@ -52,14 +52,7 @@ int main(int argc, const char* const argv[]) {
         50.0f
     ));
 
-    std::array<std::unique_ptr<Material>, 2> materials = {
-        std::make_unique<DiffuseMaterial>(SolidColor(1.0, 0.6, 1.0)),
-        std::make_unique<ConductiveMaterial>(ConductiveMaterial::copper(0.05, 0.2))
-    };
-    std::array<float, 2> weights = {0.1, 0.9};
-    MixedMaterial material(
-        std::move(materials), std::move(weights)
-    );
+    auto material = ConductiveMaterial::copper(0.05, 0.2);
     scene.add_obj(filename, &material);
 
     DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));

@@ -85,7 +85,7 @@ private:
 
 // represents microgeometry (roughness) of a surface
 struct TrowbridgeReitzDistribution {
-    TrowbridgeReitzDistribution(float alpha_x, float alpha_y) : m_alpha_x(alpha_x), m_alpha_y(alpha_y) {}
+    TrowbridgeReitzDistribution(float alpha_x, float alpha_y);
 
     float operator()(Vec3 wm) const;
     float operator()(Vec3 w, Vec3 wm) const;
