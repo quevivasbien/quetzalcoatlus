@@ -58,11 +58,13 @@ SpectrumSample sample_lights(
     Sampler& sampler
 ) {
     auto [light, sample_proba] = scene.sample_lights(si.point, si.normal, sampler);
+    // need to do this regardless of early exit in order to keep sampler depth even
+    Vec2 sample2 = sampler.sample_2d();
     if (!light) {
-        sampler.sample_2d();  // need to do this to keep sampler depth even
+        sampler.sample_2d();  
         return SpectrumSample(0.0f);
     }
-    auto ls = light->sample(si, wavelengths, sampler);
+    auto ls = light->sample(si, wavelengths, sample2);
     if (!ls || ls->spec.is_zero() || ls->pdf == 0.0f) {
         return SpectrumSample(0.0f);
     }
@@ -90,7 +92,7 @@ PixelSample sample_pixel(
     Sampler& sampler,
     size_t max_bounces
 ) {
-    PixelSample sample{};
+    PixelSample pxs{};
     SpectrumSample weight(1.0f);
     size_t depth = 0;
     bool specular_bounce = false;
@@ -99,7 +101,6 @@ PixelSample sample_pixel(
     float ior_scale = 1.0f;
     Pt3 last_p;
     Vec3 last_normal;
-    // TODO: Handle weights of light sampling, specular bounce
     while (!weight.is_zero()) {
         auto si = scene.ray_intersect(ray, wavelengths, sampler);
         // no intersection, add background and break
@@ -107,12 +108,12 @@ PixelSample sample_pixel(
             break;
         }
         if (depth == 0) {
-            sample.normal = si->normal;
+            pxs.normal = si->normal;
         }
         auto emitted = si->emission(-ray.d, wavelengths);
         if (!emitted.is_zero()) {
             if (depth == 0 || specular_bounce) {
-                sample.color += weight * emitted;
+                pxs.color += weight * emitted;
             }
             else {
                 // compute importance-sampled weight for area light
@@ -122,29 +123,32 @@ PixelSample sample_pixel(
                     * light->pdf(last_p, ray.d);
                 float light_weight = power_heuristic(1, p_b, 1, light_proba);
 
-                sample.color += emitted * (weight * light_weight);
+                pxs.color += emitted * (weight * light_weight);
             }
         }
         if (depth == max_bounces) {
             break;
         }
-        auto bsdf = si->bsdf(ray, wavelengths, sampler);
+
+        auto bsdf = si->bsdf(ray, wavelengths, sampler.sample_1d());
         if (!bsdf) {
+            // I think this might mess up sample depth
+            // This should never happen now, but is something to pay attention to in the future
             ray = si->skip_intersection(ray);
             continue;
         }
         
         if (!bsdf->is_specular()) {
             // sample direct illumination from light sources
-            sample.color += weight * sample_lights(scene, *si, *bsdf, wavelengths, sampler);
+            pxs.color += weight * sample_lights(scene, *si, *bsdf, wavelengths, sampler);
         }
 
-        auto bsdf_sample = bsdf->sample(si->wo, sampler);
+        auto bsdf_sample = bsdf->sample(si->wo, sampler.sample_1d(), sampler.sample_2d());
         if (!bsdf_sample) {
             break;
         }
         if (depth == 0) {
-            sample.albedo = bsdf_sample->spec;
+            pxs.albedo = bsdf_sample->spec;
         }
 
         weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(si->normal)) / bsdf_sample->pdf;
@@ -162,17 +166,18 @@ PixelSample sample_pixel(
         depth++;
 
         // maybe terminate early (russian roulette)
+        float roulette_sample = sampler.sample_1d();
         auto rr_weight = weight * ior_scale;
         if (rr_weight.max_component() < 1.f && depth > 1) {
             float q = std::max(0.0f, 1.0f - rr_weight.max_component());
-            if (sampler.sample_1d() < q) {
+            if (roulette_sample < q) {
                 break;
             }
             weight /= 1.0f - q;
         }
     }
 
-    return sample;
+    return pxs;
 }
 
 void render_pixels(
@@ -201,10 +206,10 @@ void render_pixels(
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
             WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
-            auto sample = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
-            color += camera.sensor.to_sensor_rgb(sample.color, wavelengths);
-            albedo += camera.sensor.to_sensor_rgb(sample.albedo, wavelengths);
-            normal += sample.normal;
+            auto pxs = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
+            color += camera.sensor.to_sensor_rgb(pxs.color, wavelengths);
+            albedo += camera.sensor.to_sensor_rgb(pxs.albedo, wavelengths);
+            normal += pxs.normal;
         }
         
         color /= float(n_samples);
@@ -259,6 +264,8 @@ RenderResult render(
     }
     
     size_t image_size = result.width * result.height;
+    Sampler sampler(n_samples, camera.image_width, camera.image_height, 0);
+
     #ifdef MULTITHREADED
     std::vector<std::thread> threads;
     size_t n_threads = std::clamp<size_t>(
@@ -267,7 +274,12 @@ RenderResult render(
     );
     std::cout << "Using " << n_threads << " threads" << std::endl;
 
-    HaltonSampler sampler_prototype(n_samples, camera.image_width, camera.image_height, 0);
+    // make a copy of the sampler for each thread
+    std::vector<Sampler> samplers;
+    samplers.reserve(n_threads);
+    for (size_t t = 0; t < n_threads; t++) {
+        samplers.push_back(sampler);
+    }
 
     size_t end_index = 0;
     std::mutex mutex;
@@ -281,13 +293,11 @@ RenderResult render(
             }
         }
 
-        auto sampler = HaltonSampler(sampler_prototype);
-
         threads.push_back(std::thread(
             render_pixels,
             std::ref(camera),
             std::ref(scene),
-            std::ref(sampler),
+            std::ref(samplers[t]),
             max_bounces,
             std::ref(result),
             start_index,
@@ -301,7 +311,6 @@ RenderResult render(
     }
     #else
     // Single threaded render
-    HaltonSampler sampler(n_samples, camera.image_width, camera.image_height, 0);
     std::mutex _mutex;
     render_pixels(
         camera, scene, sampler, max_bounces,

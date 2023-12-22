@@ -22,7 +22,7 @@ int main() {
         std::make_unique<AreaLight>(
             std::move(light_shape),
             light_spectrum,
-            16.0f,
+            12.0f,
             false
         )
     );
@@ -72,7 +72,7 @@ int main() {
         Pt3(-0.8f, -1.25f, -4.4f), 0.75f,
         &dielectric
     );
-    auto metal = ConductiveMaterial::copper();
+    auto metal = ConductiveMaterial::copper(0.2, 0.2);
     scene.add_sphere(
         Pt3(0.6f, -1.0f, -5.5f), 1.0f,
         &metal

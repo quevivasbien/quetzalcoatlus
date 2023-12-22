@@ -4,7 +4,7 @@
 
 #include "color/color.hpp"
 #include "onb.hpp"
-#include "random.hpp"
+#include "sampler.hpp"
 #include "vec.hpp"
 
 struct ScatterType {
@@ -30,7 +30,7 @@ public:
     virtual SpectrumSample operator()(Vec3 wo, Vec3 wi) const = 0;
 
     // sample incident light direction for a given outgoing direction
-    virtual std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const = 0;
+    virtual std::optional<BSDFSample> sample(Vec3 wo, float sample1, Vec2 sample2) const = 0;
 
     virtual float pdf(Vec3 wo, Vec3 wi) const = 0;
 
@@ -54,7 +54,7 @@ public:
 
     SpectrumSample operator()(Vec3 wo_render, Vec3 wi_render) const;
 
-    std::optional<BSDFSample> sample(Vec3 wo_render, Sampler& sampler) const;
+    std::optional<BSDFSample> sample(Vec3 wo_render, float sample1, Vec2 sample2) const;
 
     float pdf(Vec3 wo_render, Vec3 wi_render) const;
 
@@ -76,7 +76,7 @@ public:
     explicit DiffuseBxDF(SpectrumSample&& reflectance) : m_reflectance(std::move(reflectance)) {}
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
-    std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
+    std::optional<BSDFSample> sample(Vec3 wo, float sample1, Vec2 sample2) const override;
     float pdf(Vec3 wo, Vec3 wi) const override;
 
 private:
@@ -90,7 +90,7 @@ struct TrowbridgeReitzDistribution {
     float operator()(Vec3 wm) const;
     float operator()(Vec3 w, Vec3 wm) const;
     
-    Vec3 sample(Vec3 w, Sampler& sampler) const;
+    Vec3 sample(Vec3 w, Vec2 sample2) const;
 
     bool is_smooth() const;
 
@@ -114,8 +114,10 @@ public:
     ) : m_ior(ior), m_absorption(absorption), m_roughness(roughness) {}
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
-    std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
+    std::optional<BSDFSample> sample(Vec3 wo, float sample1, Vec2 sample2) const override;
     float pdf(Vec3 wo, Vec3 wi) const override;
+
+    bool is_specular() const override;
 
 private:
     SpectrumSample m_ior;
@@ -129,7 +131,7 @@ public:
     explicit DielectricBxDF(float ior) : m_ior(ior) {}
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
-    std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
+    std::optional<BSDFSample> sample(Vec3 wo, float sample1, Vec2 sample2) const override;
     float pdf(Vec3 wo, Vec3 wi) const override;
 
     bool is_specular() const override { return true; }
@@ -144,7 +146,7 @@ public:
     explicit ThinDielectricBxDF(float ior) : m_ior(ior) {}
 
     SpectrumSample operator()(Vec3 wo, Vec3 wi) const override;
-    std::optional<BSDFSample> sample(Vec3 wo, Sampler& sampler) const override;
+    std::optional<BSDFSample> sample(Vec3 wo, float sample1, Vec2 sample2) const override;
     float pdf(Vec3 wo, Vec3 wir) const override;
 
     bool is_specular() const override { return true; }

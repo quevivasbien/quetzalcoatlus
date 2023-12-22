@@ -1,11 +1,10 @@
 #include <cmath>
 #include <cstring>
 
-#include "random.hpp"
+#include "sampler.hpp"
 #include "util.hpp"
 
-Vec2 Sampler::sample_uniform_disk() {
-    Vec2 uv = sample_2d();
+Vec2 Sampler::sample_uniform_disk(Vec2 uv) {
     Vec2 offset = 2.0f * uv - Vec2(1.0f, 1.0f);
     if (offset.x == 0.0f && offset.y == 0.0f) {
         return Vec2(0.0f, 0.0f);
@@ -22,15 +21,21 @@ Vec2 Sampler::sample_uniform_disk() {
     return Vec2(r * std::cos(theta), r * std::sin(theta));
 }
 
-Vec2 Sampler::sample_uniform_disk_polar() {
-    Vec2 uv = sample_2d();
+Vec2 Sampler::sample_uniform_disk() {
+    return sample_uniform_disk(sample_2d());
+}
+
+Vec2 Sampler::sample_uniform_disk_polar(Vec2 uv) {
     float r = std::sqrt(uv.x);
     float theta = M_2_PI * uv.y;
     return Vec2(r * std::cos(theta), r * std::sin(theta));
 }
 
-Vec3 Sampler::sample_uniform_hemisphere() {
-    Vec2 uv = sample_2d();
+Vec2 Sampler::sample_uniform_disk_polar() {
+    return sample_uniform_disk_polar(sample_2d());
+}
+
+Vec3 Sampler::sample_uniform_hemisphere(Vec2 uv) {
     float z = uv.x;
     float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
     float phi = 2.0f * M_PI * uv.y;
@@ -41,9 +46,11 @@ Vec3 Sampler::sample_uniform_hemisphere() {
     );
 }
 
-Vec3 Sampler::sample_uniform_sphere() {
-    Vec2 uv = sample_2d();
+Vec3 Sampler::sample_uniform_hemisphere() {
+    return sample_uniform_hemisphere(sample_2d());
+}
 
+Vec3 Sampler::sample_uniform_sphere(Vec2 uv) {
     float z = 1.0f - 2.0f * uv.x;
     float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
     float phi = 2.0f * M_PI * uv.y;
@@ -51,59 +58,53 @@ Vec3 Sampler::sample_uniform_sphere() {
     return Vec3(r * cosf(phi), r * sinf(phi), z);
 }
 
-Vec3 Sampler::sample_cosine_hemisphere() {
+Vec3 Sampler::sample_uniform_sphere() {
+    return sample_uniform_sphere(sample_2d());
+}
+
+Vec3 Sampler::sample_cosine_hemisphere(Vec2 uv) {
     // sample from unit disk
-    Vec2 d = sample_uniform_disk();
+    Vec2 d = sample_uniform_disk(uv);
     // project up to a hemisphere
     float z = std::sqrt(std::max(0.0f, 1.0f - d.x * d.x - d.y * d.y));
     return Vec3(d.x, d.y, z);
 }
 
-float Sampler::sample_linear(float a, float b) {
-    float u = sample_1d();
-    float x = u * (a + b) / (a + std::sqrt(lerp(a * a, b * b, u)));
-    return std::min(x, ONE_MINUS_EPS);
+Vec3 Sampler::sample_cosine_hemisphere() {
+    return sample_cosine_hemisphere(sample_2d());
 }
 
-float Sampler::linear_pdf(float x, float a, float b) {
-    if (x < 0.0f || x > 1.0f) {
-        return 0.0f;
-    }
-    return 2.0f * lerp(a, b, x) / (a + b);
-}
+// float Sampler::sample_linear(float a, float b) {
+//     float u = sample_1d();
+//     float x = u * (a + b) / (a + std::sqrt(lerp(a * a, b * b, u)));
+//     return std::min(x, ONE_MINUS_EPS);
+// }
 
-Vec2 Sampler::sample_bilinear(const std::array<float, 4>& w) {
-    float y = sample_linear(w[0] + w[1], w[2] + w[3]);
-    float x = sample_linear(lerp(w[0], w[2], y), lerp(w[1], w[3], y));
-    return Vec2(x, y);
-}
+// float Sampler::linear_pdf(float x, float a, float b) {
+//     if (x < 0.0f || x > 1.0f) {
+//         return 0.0f;
+//     }
+//     return 2.0f * lerp(a, b, x) / (a + b);
+// }
 
-float Sampler::bilinear_pdf(const Vec2& uv, const std::array<float, 4>& w) {
-    if (uv.x < 0.0f || uv.x > 1.0f || uv.y < 0.0f || uv.y > 1.0f) {
-        return 0.0f;
-    }
-    if (w[0] + w[1] + w[2] + w[3] == 0.0f) {
-        return 1.0f;
-    }
-    return 4.0f * (
-        (1.0f - uv.x) * (1.0f - uv.y) * w[0] + uv.x * (1 - uv.y) * w[1]
-        + (1.0f - uv.x) * uv.y * w[2] + uv.x * uv.y * w[3]
-    ) / (w[0] + w[1] + w[2] + w[3]);
-}
+// Vec2 Sampler::sample_bilinear(const std::array<float, 4>& w) {
+//     float y = sample_linear(w[0] + w[1], w[2] + w[3]);
+//     float x = sample_linear(lerp(w[0], w[2], y), lerp(w[1], w[3], y));
+//     return Vec2(x, y);
+// }
 
-
-float BasicSampler::sample_1d() {
-    return dist(rng);
-}
-
-Vec2 BasicSampler::sample_2d() {
-    return Vec2(dist(rng), dist(rng));
-}
-
-void BasicSampler::start_pixel_sample(int x, int y, int sample_index, int dim) {
-    // does nothing
-}
-
+// float Sampler::bilinear_pdf(const Vec2& uv, const std::array<float, 4>& w) {
+//     if (uv.x < 0.0f || uv.x > 1.0f || uv.y < 0.0f || uv.y > 1.0f) {
+//         return 0.0f;
+//     }
+//     if (w[0] + w[1] + w[2] + w[3] == 0.0f) {
+//         return 1.0f;
+//     }
+//     return 4.0f * (
+//         (1.0f - uv.x) * (1.0f - uv.y) * w[0] + uv.x * (1 - uv.y) * w[1]
+//         + (1.0f - uv.x) * uv.y * w[2] + uv.x * uv.y * w[3]
+//     ) / (w[0] + w[1] + w[2] + w[3]);
+// }
 
 // Utility functions for Halton sampler
 
@@ -379,8 +380,8 @@ const int MAX_HALTON_RESOLUTION = 128;
 
 // And finally the actual sampler functions!
 
-HaltonSampler::HaltonSampler(int samples_per_pixel, int x_res, int y_res, uint32_t seed) :
-    Sampler(samples_per_pixel),
+Sampler::Sampler(int samples_per_pixel, int x_res, int y_res, uint32_t seed) :
+    m_samples_per_pixel(samples_per_pixel),
     m_permutations(compute_radical_inv_permutations(seed))
 {
     std::array<int, 2> full_res = { x_res, y_res };
@@ -400,7 +401,7 @@ HaltonSampler::HaltonSampler(int samples_per_pixel, int x_res, int y_res, uint32
     mult_inverse[1] = multiplicative_inv(base_scales[0], base_scales[1]);
 }
 
-void HaltonSampler::start_pixel_sample(int x, int y, int sample_index, int dim) {
+void Sampler::start_pixel_sample(int x, int y, int sample_index, int dim) {
     halton_index = 0;
     int sample_stride = base_scales[0] * base_scales[1];
     if (sample_stride > 1) {
@@ -420,18 +421,18 @@ void HaltonSampler::start_pixel_sample(int x, int y, int sample_index, int dim) 
     dimension = std::max(2, dim);
 }
 
-float HaltonSampler::sample_dimension(int dim) const {
+float Sampler::sample_dimension(int dim) const {
     return radical_inv(dim, halton_index);
 }
 
-float HaltonSampler::sample_1d() {
+float Sampler::sample_1d() {
     if (dimension >= PRIMES.size()) {
         dimension = 2;
     }
     return sample_dimension(dimension++);
 }
 
-Vec2 HaltonSampler::sample_2d() {
+Vec2 Sampler::sample_2d() {
     if (dimension + 1 >= PRIMES.size()) {
         dimension = 2;
     }
@@ -440,7 +441,7 @@ Vec2 HaltonSampler::sample_2d() {
     return Vec2(sample_dimension(dim), sample_dimension(dim + 1));
 }
 
-Vec2 HaltonSampler::sample_pixel() {
+Vec2 Sampler::sample_pixel() {
     return Vec2(
         radical_inv(0, halton_index >> base_exps[0]),
         radical_inv(1, halton_index / base_scales[1])

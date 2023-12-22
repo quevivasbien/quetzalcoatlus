@@ -5,8 +5,8 @@ target_sources(lib
         image.cpp
         material.cpp
         light.cpp
-        random.cpp
         render.cpp
+        sampler.cpp
         scene.cpp
         texture.cpp
         transform.cpp

@@ -3,7 +3,7 @@
 #include <cmath>
 #include <tuple>
 
-#include "random.hpp"
+#include "sampler.hpp"
 #include "vec.hpp"
 
 enum ShapeType {
@@ -23,7 +23,7 @@ struct ShapeSample {
 class Shape {
 public:
     // randomly sample a point on the shape's surface
-    virtual ShapeSample sample_point(Sampler& sampler) const = 0;
+    virtual ShapeSample sample_point(Vec2 sample2) const = 0;
     // get pdf for sampled point on the shape's surface
     virtual float area() const = 0;
     virtual float pdf(const Pt3& p) const {
@@ -41,9 +41,8 @@ public:
     Quad(const Pt3& p00, const Vec3& du, const Vec3& dv)
         : m_p00(p00), m_du(du), m_dv(dv), m_normal(du.cross(dv).normalize()), m_area(du.cross(dv).norm()) {}
 
-    ShapeSample sample_point(Sampler& sampler) const override {
-        Vec2 uv = sampler.sample_2d();
-        Pt3 p = m_p00 + m_du * uv.x + m_dv * uv.y;
+    ShapeSample sample_point(Vec2 sample2) const override {
+        Pt3 p = m_p00 + m_du * sample2.x + m_dv * sample2.y;
         return { p, m_normal, 1.0f / area() };
     }
 
@@ -76,8 +75,8 @@ class Sphere : public Shape {
 public:
     Sphere(const Pt3& center, float radius) : m_center(center), m_radius(radius) {}
 
-    ShapeSample sample_point(Sampler& sampler) const override {
-        Vec3 n = sampler.sample_uniform_sphere();
+    ShapeSample sample_point(Vec2 sample2) const override {
+        Vec3 n = Sampler::sample_uniform_sphere(sample2);
         auto p = m_center + m_radius * n;
         return { p, n, 1.0f / area() };
     }

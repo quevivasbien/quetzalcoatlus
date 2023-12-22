@@ -5,7 +5,7 @@
 
 #include "bxdf.hpp"
 #include "color/color.hpp"
-#include "random.hpp"
+#include "sampler.hpp"
 #include "ray.hpp"
 #include "material.hpp"
 #include "texture.hpp"
@@ -15,7 +15,7 @@ struct SurfaceInteraction;
 
 class Material {
 public:
-    virtual BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const = 0;
+    virtual BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const = 0;
 };
 
 
@@ -26,7 +26,7 @@ public:
     template <typename T>
     explicit DiffuseMaterial(T&& texture) : m_texture(std::make_unique<T>(std::forward<T>(texture))) {}
 
-    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const override;
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
 
     std::unique_ptr<Texture> m_texture;
 };
@@ -42,7 +42,7 @@ public:
         TrowbridgeReitzDistribution roughness = TrowbridgeReitzDistribution(0.0f, 0.0f)
     ) : m_ior(ior), m_absorption(absorption), m_roughness(roughness) {}
 
-    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const override;
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
 
     static ConductiveMaterial alluminum(float roughness_a = 0.0f, float roughness_b = 0.0f);
     static ConductiveMaterial copper(float roughness_a = 0.0f, float roughness_b = 0.0f);
@@ -59,7 +59,7 @@ public:
 
     explicit DielectricMaterial(std::shared_ptr<const Spectrum> ior) : m_ior(ior), is_constant(false) {}
 
-    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const override;
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
 
     bool is_constant;
     std::shared_ptr<const Spectrum> m_ior;
@@ -70,7 +70,7 @@ class ThinDielectricMaterial : public Material {
 public:
     explicit ThinDielectricMaterial(float ior) : m_ior(std::make_shared<ConstantSpectrum>(ior)), is_constant(true) {}
 
-    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const override;
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
 
     bool is_constant;
     std::shared_ptr<Spectrum> m_ior;
@@ -89,10 +89,9 @@ public:
         });
     }
     
-    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const override {
-        float u = sampler.sample_1d();
-        size_t idx = u * m_materials.size();
-        return m_materials[idx]->bsdf(si, wavelengths, sampler);
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override {
+        size_t idx = sample * m_materials.size();
+        return m_materials[idx]->bsdf(si, wavelengths, sample);
     }
 
     std::array<std::unique_ptr<Material>, N> m_materials;

@@ -5,7 +5,7 @@ SpectrumSample PointLight::total_emission(const WavelengthSample& wavelengths) c
     return SpectrumSample::from_spectrum(*m_spectrum, wavelengths) * (4.0f * M_PI * m_scale);
 }
 
-std::optional<LightSample> PointLight::sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const {
+std::optional<LightSample> PointLight::sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Vec2 _sample2) const {
     Vec3 wi = (m_point - si.point).normalize();
     auto spec = SpectrumSample::from_spectrum(*m_spectrum, wavelengths) * (m_scale / (m_point - si.point).norm_squared());
     return LightSample {
@@ -23,8 +23,8 @@ SpectrumSample AreaLight::total_emission(const WavelengthSample& wavelengths) co
 }
 
 
-std::optional<LightSample> AreaLight::sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const {
-    auto ss = m_shape->sample_point(sampler);
+std::optional<LightSample> AreaLight::sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Vec2 sample2) const {
+    auto ss = m_shape->sample_point(sample2);
     if (ss.pdf == 0.0f || (ss.p - si.point).norm_squared() == 0.0f) {
         return std::nullopt;
     }

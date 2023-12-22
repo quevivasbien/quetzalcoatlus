@@ -13,7 +13,7 @@
 #include "interaction.hpp"
 #include "light.hpp"
 #include "material.hpp"
-#include "random.hpp"
+#include "sampler.hpp"
 #include "ray.hpp"
 #include "vec.hpp"
 

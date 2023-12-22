@@ -29,7 +29,7 @@ public:
     virtual SpectrumSample total_emission(const WavelengthSample& wavelengths) const = 0;
 
     // sample light received at point on surface (si refers to surface receiving light, not the light itself)
-    virtual std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const = 0;
+    virtual std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Vec2 sample2) const = 0;
     // get pdf for light from source, along wi to point p
     // note that here p is the point that receives the light, not a point on the light
     virtual float pdf(const Pt3& p, const Vec3& wi) const {
@@ -59,7 +59,7 @@ public:
 
     SpectrumSample total_emission(const WavelengthSample& wavelengths) const override;
 
-    std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const override;
+    std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Vec2 sample2) const override;
 
     Pt3 m_point;
 };
@@ -76,7 +76,7 @@ public:
 
     SpectrumSample total_emission(const WavelengthSample& wavelengths) const override;
 
-    std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Sampler& sampler) const override;
+    std::optional<LightSample> sample(const SurfaceInteraction& si, const WavelengthSample& wavelengths, Vec2 sample2) const override;
     float pdf(const Pt3& p, const Vec3& wi) const override;
     SpectrumSample emission(const Pt3& p, const Vec3& n, const Vec3& w, const WavelengthSample& wavelengths) const override;
 

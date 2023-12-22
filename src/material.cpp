@@ -1,7 +1,7 @@
 #include "interaction.hpp"
 #include "material.hpp"
 
-BSDF DiffuseMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const {
+BSDF DiffuseMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float _sample) const {
     auto r = m_texture->value(si.uv, si.point, wavelengths);
     return BSDF(
         si.normal,
@@ -9,7 +9,7 @@ BSDF DiffuseMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavel
     );
 }
 
-BSDF ConductiveMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const {
+BSDF ConductiveMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float _sample) const {
     auto ior = SpectrumSample::from_spectrum(*m_ior, wavelengths);
     auto absorption = SpectrumSample::from_spectrum(*m_absorption, wavelengths);
 
@@ -35,7 +35,7 @@ ConductiveMaterial ConductiveMaterial::copper(float roughness_a, float roughness
     );
 }
 
-BSDF DielectricMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const {
+BSDF DielectricMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float _sample) const {
     float ior = (*m_ior)(wavelengths[0]);
     if (!is_constant) {
         wavelengths.terminate_secondary();
@@ -47,7 +47,7 @@ BSDF DielectricMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wa
     );
 }
 
-BSDF ThinDielectricMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, Sampler& sampler) const {
+BSDF ThinDielectricMaterial::bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float _sample) const {
     float ior = (*m_ior)(wavelengths[0]);
     if (!is_constant) {
         wavelengths.terminate_secondary();
