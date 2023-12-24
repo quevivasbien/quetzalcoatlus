@@ -11,18 +11,23 @@
 int main() {
     Scene scene(initialize_device());
 
-    auto light_color = SolidColor(
-        std::make_shared<RGBIlluminantSpectrum>(RGB(8.0f, 8.0f, 8.0f))
-    );
-    EmissiveMaterial light{ light_color };
-    scene.add_quad(
-        Pt3(-1.f, 1.9999f, -6.f),
-        Pt3(1.f, 1.9999f, -6.f),
-        Pt3(1.f, 1.9999f, -4.f),
+    auto light_spectrum = 
+        spectra::ILLUM_D65();
+    auto light_shape = std::make_unique<Quad>(
         Pt3(-1.f, 1.9999f, -4.f),
-        &light
+        Vec3(0.f, 0.f, -2.f),
+        Vec3(2.f, 0.f, 0.f)
     );
-    LambertMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
+    scene.add_light(
+        std::make_unique<AreaLight>(
+            std::move(light_shape),
+            light_spectrum,
+            12.0f,
+            false
+        )
+    );
+
+    DiffuseMaterial ceiling(SolidColor(0.8f, 0.4f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, 2.f, -7.f),
         Pt3(2.f, 2.f, -7.f),
@@ -30,7 +35,7 @@ int main() {
         Pt3(-2.f, 2.f, -3.f),
         &ceiling
     );
-    LambertMaterial floor(SolidColor(0.1f, 0.6f, 0.8f));
+    DiffuseMaterial floor(SolidColor(0.1f, 0.6f, 0.8f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -3.f),
         Pt3(2.f, -2.f, -3.f),
@@ -38,7 +43,7 @@ int main() {
         Pt3(-2.f, -2.f, -7.f),
         &floor
     );
-    LambertMaterial left_wall(SolidColor(0.8f, 0.0f, 0.1f));
+    DiffuseMaterial left_wall(SolidColor(0.8f, 0.0f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -3.f),
         Pt3(-2.f, -2.f, -7.f),
@@ -46,7 +51,7 @@ int main() {
         Pt3(-2.f, 2.f, -3.f),
         &left_wall
     );
-    LambertMaterial right_wall(SolidColor(0.1f, 0.1f, 0.8f));
+    DiffuseMaterial right_wall(SolidColor(0.1f, 0.1f, 0.8f));
     scene.add_quad(
         Pt3(2.f, -2.f, -3.f),
         Pt3(2.f, 2.f, -3.f),
@@ -54,7 +59,7 @@ int main() {
         Pt3(2.f, -2.f, -7.f),
         &right_wall
     );
-    LambertMaterial back_wall(SolidColor(0.1f, 0.8f, 0.1f));
+    DiffuseMaterial back_wall(SolidColor(0.1f, 0.8f, 0.1f));
     scene.add_quad(
         Pt3(-2.f, -2.f, -7.f),
         Pt3(2.f, -2.f, -7.f),
@@ -62,15 +67,15 @@ int main() {
         Pt3(-2.f, 2.f, -7.f),
         &back_wall
     );
-    RefractiveMaterial refractive_sphere(SolidColor(0.9f, 0.9f, 0.9f), 1.4f);
+    DielectricMaterial dielectric(std::make_shared<RGBUnboundedSpectrum>(RGB(1.1f, 1.8f, 3.0f)));
     scene.add_sphere(
         Pt3(-0.8f, -1.25f, -4.4f), 0.75f,
-        &refractive_sphere
+        &dielectric
     );
-    SpecularMaterial specular_sphere(SolidColor(0.96, 0.9, 1.0), 0.05);
+    auto metal = ConductiveMaterial::copper(0.1, 0.06);
     scene.add_sphere(
         Pt3(0.6f, -1.0f, -5.5f), 1.0f,
-        &specular_sphere
+        &metal
     );
     
     scene.commit();
@@ -78,8 +83,8 @@ int main() {
     Camera camera(
         800, 800, M_PI / 3.0f
     );
-    size_t n_samples = 36;
-    size_t max_bounces = 32;
+    size_t n_samples = 128;
+    size_t max_bounces = 64;
 
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
         n_samples << " samples and " << max_bounces << " bounces" << std::endl;

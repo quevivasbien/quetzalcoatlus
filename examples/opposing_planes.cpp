@@ -8,30 +8,41 @@
 int main() {
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(
-        std::make_shared<RGBIlluminantSpectrum>(RGB(2.6, 0.8, 1.2))
+    scene.add_light(std::make_unique<PointLight>(
+        Pt3(-2., -1., 1.),
+        std::make_shared<RGBIlluminantSpectrum>(RGB(6.0, 0.2, 0.2)),
+        20.0f
     ));
-    scene.add_plane(
-        Pt3(0., 0., 5.),
-        Vec3(-1., 0., -1.).normalize(),
-        &light
-    );
+    scene.add_light(std::make_unique<PointLight>(
+        Pt3(-2., 1., 1.),
+        std::make_shared<RGBIlluminantSpectrum>(RGB(0.2, 0.2, 6.0)),
+        20.0f
+    ));
+    // scene.add_light(std::make_unique<AreaLight>(
+    //     std::make_unique<Quad>(
+    //         Pt3(-8, -4, 4),
+    //         Vec3(0, 8, 2),
+    //         Vec3(8, 0, 0)
+    //     ),
+    //     std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0)),
+    //     1.0f
+    // ));
 
-    SpecularMaterial right_plane(SolidColor(221. / 255., 15. / 255., 110. / 255.), 0.1);
+    auto right_plane = ConductiveMaterial::copper(0.4, 0.2);
     scene.add_plane(
         Pt3(0., 0., -10.),
         Vec3(-0.5, 0.5, 1.).normalize(),
         &right_plane
     );
 
-    SpecularMaterial left_plane(SolidColor(19. / 255., 70. / 255., 180. / 255.), 0.1);
+    auto left_plane = ConductiveMaterial::alluminum(0.3, 0.6);
     scene.add_plane(
         Pt3(0., 0., -10.),
         Vec3(0.5, -0.5, 1.).normalize(),
         &left_plane
     );
 
-    RefractiveMaterial sphere(SolidColor(1.0, 1.0, 1.0), 1.2);
+    DielectricMaterial sphere(spectra::GLASS_SF11_IOR());
     scene.add_sphere(
         Pt3(1., 1., -5.), 0.8,
         &sphere
@@ -62,6 +73,7 @@ int main() {
         "ms" << std::endl;
 
     result.save("opposing_planes_no_denoise.png");
+    result.save_albedo("opposing_planes_albedo.png");
     result.denoise();
     result.save("opposing_planes.png");
 

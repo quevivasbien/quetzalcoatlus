@@ -6,8 +6,9 @@
 #include "rgb_to_spectrum_opt.hpp"
 #include "rgb.hpp"
 #include "spectra.hpp"
+#include "util.hpp"
 
-const size_t SPECTRUM_TABLE_RES = 64;
+const size_t SPECTRUM_TABLE_RES = 32;
 
 RGBColorSpace::RGBColorSpace(
     Vec2 r, Vec2 g, Vec2 b,
@@ -48,18 +49,17 @@ RGB RGBColorSpace::rgb_from_sample(const SpectrumSample& ss, const WavelengthSam
 
 RGBSigmoidPolynomial RGBColorSpace::to_spectrum(const RGB& rgb) const {
     return m_table->operator()(RGB(
-        std::max(rgb.x, 0.0f),
-        std::max(rgb.y, 0.0f),
-        std::max(rgb.z, 0.0f)
+        std::clamp(rgb.x, 0.0f, 1.0f),
+        std::clamp(rgb.y, 0.0f, 1.0f),
+        std::clamp(rgb.z, 0.0f, 1.0f)
     ));
 }
-
 
 float sigmoid(float x) {
     if (std::isinf(x)) {
         return x > 0.0f ? 1.0f : 0.0f;
     }
-    return 0.5f + x / (2.0f * std::sqrt(1.0f + x * x));
+    return 0.5f + 0.5f *x / (std::sqrt(1.0f + x * x));
 }
 
 float RGBSigmoidPolynomial::operator()(float lambda) const {
@@ -75,15 +75,11 @@ float RGBSigmoidPolynomial::max_value() const {
     return result;
 }
 
-float lerp(float a, float b, float t) {
-    return a * (1.0f - t) + b * t;
-}
-
 RGBSigmoidPolynomial RGBToSpectrumTable::operator()(const RGB& rgb) const {
     if (rgb.r() == rgb.g() && rgb.g() == rgb.b()) {
         // returns a constant spectrum
         return RGBSigmoidPolynomial(
-            0.0f, 0.0f, (rgb.r() - 0.5f) / std::sqrt(rgb.r() * (1.0f - rgb.r()))
+            0.0f, 0.0f, (rgb.r() - 0.5f) / std::sqrt(std::max(0.0f, rgb.r() * (1.0f - rgb.r())))
         );
     }
 
@@ -175,6 +171,8 @@ RGBUnboundedSpectrum::RGBUnboundedSpectrum(RGB rgb, const RGBColorSpace& cs) {
     m_polynomial = cs.to_spectrum(rgb_);
 }
 
+RGBUnboundedSpectrum::RGBUnboundedSpectrum(float r, float g, float b, const RGBColorSpace& cs) : RGBUnboundedSpectrum(RGB(r, g, b), cs) {}
+
 float RGBUnboundedSpectrum::operator()(float lambda) const {
     return m_scale * m_polynomial(lambda);
 }
@@ -187,6 +185,8 @@ RGBIlluminantSpectrum::RGBIlluminantSpectrum(
     RGB rgb_ = m_scale ? RGB(rgb / m_scale) : RGB(0, 0, 0);
     m_polynomial = cs.to_spectrum(rgb_);
 }
+
+RGBIlluminantSpectrum::RGBIlluminantSpectrum(float r, float g, float b, const RGBColorSpace& cs) : RGBIlluminantSpectrum(RGB(r, g, b), cs) {}
 
 float RGBIlluminantSpectrum::operator()(float lambda) const {
     if (!m_illuminant) {

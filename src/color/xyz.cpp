@@ -17,7 +17,7 @@ XYZ XYZ::from_sample(const SpectrumSample& ss, const WavelengthSample& wavelengt
     auto sx = SpectrumSample::from_spectrum(*spectra::X(), wavelengths);
     auto sy = SpectrumSample::from_spectrum(*spectra::Y(), wavelengths);
     auto sz = SpectrumSample::from_spectrum(*spectra::Z(), wavelengths);
-    auto pdf = SpectrumSample::from_wavelengths(wavelengths);
+    auto pdf = SpectrumSample::from_wavelengths_pdf(wavelengths);
     float x = ((sx * ss) / pdf).average() / spectra::CIE_Y_INTEGRAL;
     float y = ((sy * ss) / pdf).average() / spectra::CIE_Y_INTEGRAL;
     float z = ((sz * ss) / pdf).average() / spectra::CIE_Y_INTEGRAL;

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -10,9 +11,6 @@
 
 // if defined, run in multithreaded mode, helpful to disable when debugging
 #define MULTITHREADED
-// if defined, test for more than 1 intersection at a time
-// NOTE: I've currently only been able to get a packet size of 4 to work, though 8 should work hypothetically
-// #define PACKET_SIZE 4
 
 // the number of pixels given to a single thread at a time
 const size_t THREAD_JOB_SIZE = 4096;
@@ -43,181 +41,146 @@ struct PixelSample {
     }
 };
 
-SpectrumSample sample_pixel_inner(
-    const Ray& r,
-    const Scene& scene,
-    const WavelengthSample& wavelengths,
-    Sampler& sampler,
-    size_t bounces
-) {
-    if (bounces == 0) {
-        return SpectrumSample(0.0);
+float power_heuristic(int n_f, float f_pdf, int n_g, float g_pdf) {
+    float f = n_f * f_pdf;
+    float g = n_g * g_pdf;
+    if (std::isinf(f * f)) {
+        return 1.0f;
     }
-    auto isect = scene.ray_intersect(r, wavelengths, sampler);
-    if (!isect) {
+    return f * f / (f * f + g * g);
+}
+
+SpectrumSample sample_lights(
+    const Scene& scene,
+    const SurfaceInteraction& si,
+    const BSDF& bsdf,
+    const WavelengthSample& wavelengths,
+    Sampler& sampler
+) {
+    auto [light, sample_proba] = scene.sample_lights(si.point, si.normal, sampler);
+    // need to do this regardless of early exit in order to keep sampler depth even
+    Vec2 sample2 = sampler.sample_2d();
+    if (!light) {
+        sampler.sample_2d();  
         return SpectrumSample(0.0f);
     }
-    if (!isect->new_ray || isect->pdf == 0.f) {
-        return isect->color;
+    auto ls = light->sample(si, wavelengths, sample2);
+    if (!ls || ls->spec.is_zero() || ls->pdf == 0.0f) {
+        return SpectrumSample(0.0f);
     }
-    
-    return (
-        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, wavelengths, sampler, bounces-1)
-    ) / isect->pdf;
+    Vec3 wo = si.wo;
+    Vec3 wi = ls->wi;
+    auto f = bsdf(wo, wi) * std::abs(wi.dot(si.normal));
+    if (f.is_zero() || scene.occluded(si.point, ls->p_light)) {
+        return SpectrumSample(0.0f);
+    }
+    float p_l = sample_proba * ls->pdf;
+    if (light->type() == LightType::AREA) {
+        float p_b = bsdf.pdf(wo, wi);
+        float w_l = power_heuristic(1, p_l, 1, p_b);
+        return ls->spec * f * (w_l / p_l);
+    }
+    else {
+        return ls->spec * f / p_l;
+    }
 }
 
 PixelSample sample_pixel(
-    const Ray& r,
+    Ray ray,
     const Scene& scene,
-    const WavelengthSample& wavelengths,
+    WavelengthSample& wavelengths,
     Sampler& sampler,
-    size_t bounces
+    size_t max_bounces
 ) {
-    auto isect = scene.ray_intersect(r, wavelengths, sampler);
-    if (!isect) {
-        return PixelSample();
-    }
-    PixelSample pixel_sample(isect->normal, isect->color);
-    if (!isect->new_ray || isect->pdf == 0.f) {
-        pixel_sample.color = isect->color;
-        return pixel_sample;
-    }
-
-    pixel_sample.color = (
-        isect->color * isect->pdf * sample_pixel_inner(*isect->new_ray, scene, wavelengths, sampler, bounces-1)
-    ) / isect->pdf;
-
-    return pixel_sample;
-}
-
-template <size_t N>
-std::array<SpectrumSample, N> sample_pixel_inner(
-    const std::array<Ray, N>& rays,
-    const std::array<int, N>& valid,
-    const Scene& scene,
-    const std::array<WavelengthSample, N>& wavelengths,
-    Sampler& sampler,
-    size_t bounces
-) {
-    std::array<SpectrumSample, N> samples {};
-    if (bounces == 0) {
-        return samples;
-    }
-    auto isects = scene.ray_intersect(rays, wavelengths, sampler, valid);
-    std::array<Ray, N> new_rays;
-    std::array<int, N> new_valid{};
-    for (size_t i = 0; i < N; i++) {
-        if (valid[i] == 0 || !isects[i]) {
-            continue;
-        }
-        if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
-            samples[i] = isects[i]->color;
-            continue;
-        }
-        new_rays[i] = *isects[i]->new_ray;
-        new_valid[i] = -1;
-    }
-    
-    int n_valid = std::accumulate(new_valid.begin(), new_valid.end(), 0);
-    if (n_valid == 0) {
-        return samples;
-    }
-
-    std::array<SpectrumSample, N> inner_samples;
-    // there's just one active ray left, switch to single sampling, otherwise recurse deeper
-    if (n_valid == -1) {
-        for (size_t i = 0; i < N; i++) {
-            if (valid[i] == 0) {
-                inner_samples[i] = SpectrumSample(0.0f);
-            }
-            else {
-                inner_samples[i] = sample_pixel_inner(
-                    rays[i],
-                    scene,
-                    wavelengths[i],
-                    sampler,
-                    bounces-1
-                );
-            }
-        }
-    }
-    else {
-        inner_samples = sample_pixel_inner(
-            new_rays, new_valid,
-            scene,
-            wavelengths,
-            sampler,
-            bounces-1
-        );
-    }
-
-    for (size_t i = 0; i < N; i++) {
-        if (new_valid[i] == 0) {
-            continue;
-        }
-        samples[i] = (
-            isects[i]->color * isects[i]->pdf * inner_samples[i]
-        ) / isects[i]->pdf;
-    }
-    return samples;
-}
-
-template <size_t N>
-std::array<PixelSample, N> sample_pixel(
-    const std::array<Ray, N>& rays,
-    const Scene& scene,
-    const std::array<WavelengthSample, N>& wavelengths,
-    Sampler& sampler,
-    size_t bounces
-) {
-    std::array<PixelSample, N> samples{};
-    // valid = -1 means we want to continue tracing this ray
-    // valid = 0 means we want to stop tracing this ray
-    // this is just based on embree syntax for rtcIntersect4/8/16
-    std::array<Ray, N> new_rays;
-    std::array<int, N> valid{};
-    auto isects = scene.ray_intersect(rays, wavelengths, sampler);
-    for (size_t i = 0; i < N; i++) {
-        if (!isects[i]) {
-            continue;
-        }
-        samples[i].normal = isects[i]->normal;
-        samples[i].albedo = isects[i]->color;
-        if (!isects[i]->new_ray || isects[i]->pdf == 0.f) {
-            samples[i].color = isects[i]->color;
-            continue;
-        }
-        new_rays[i] = *isects[i]->new_ray;
-        valid[i] = -1;
-    }
-    bool exit = true;
-    for (size_t i = 0; i < N; i++) {
-        if (valid[i] != 0) {
-            exit = false;
+    PixelSample pxs{};
+    SpectrumSample weight(1.0f);
+    size_t depth = 0;
+    bool specular_bounce = false;
+    bool any_nonspecular_bounce = false;
+    float p_b = 1.0f;
+    float ior_scale = 1.0f;
+    Pt3 last_p;
+    Vec3 last_normal;
+    while (!weight.is_zero()) {
+        auto si = scene.ray_intersect(ray, wavelengths, sampler);
+        // no intersection, add background and break
+        if (!si) {
+            // ConstantSpectrum spec(1.);
+            // pxs.color += weight * SpectrumSample::from_spectrum(spec, wavelengths);
             break;
         }
-    }
-    if (exit) {
-        return samples;
-    }
-    
-    auto inner_samples = sample_pixel_inner(
-        new_rays, valid,
-        scene,
-        wavelengths,
-        sampler,
-        bounces-1
-    );
-    for (size_t i = 0; i < N; i++) {
-        if (valid[i] == 0) {
+        if (depth == 0) {
+            pxs.normal = si->normal;
+        }
+        // add emitted light if intersected object is an area light
+        auto emitted = si->emission(-ray.d, wavelengths);
+        if (!emitted.is_zero()) {
+            if (depth == 0 || specular_bounce) {
+                pxs.color += weight * emitted;
+            }
+            else {
+                // compute importance-sampled weight for area light
+                auto light = si->light;
+                assert(light);
+                float light_proba = scene.light_sample_pmf(last_p, last_normal, light)
+                    * light->pdf(last_p, ray.d);
+                float light_weight = power_heuristic(1, p_b, 1, light_proba);
+
+                pxs.color += emitted * (weight * light_weight);
+            }
+        }
+        if (depth == max_bounces) {
+            break;
+        }
+
+        auto bsdf = si->bsdf(ray, wavelengths, sampler.sample_1d());
+        if (!bsdf) {
+            // I think this might mess up sample depth
+            // This should never happen now, but is something to pay attention to in the future
+            ray = si->skip_intersection(ray);
             continue;
         }
-        samples[i].color = (
-            isects[i]->color * isects[i]->pdf * inner_samples[i]
-        ) / isects[i]->pdf;
+        
+        if (!bsdf->is_specular()) {
+            // sample direct illumination from light sources
+            pxs.color += weight * sample_lights(scene, *si, *bsdf, wavelengths, sampler);
+        }
+
+        auto bsdf_sample = bsdf->sample(si->wo, sampler.sample_1d(), sampler.sample_2d());
+        if (!bsdf_sample) {
+            break;
+        }
+        if (depth == 0) {
+            pxs.albedo = bsdf_sample->spec;
+        }
+
+        weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(si->normal)) / bsdf_sample->pdf;
+
+        p_b = bsdf_sample->pdf_is_proportional ? bsdf->pdf(si->wo, bsdf_sample->wi) : bsdf_sample->pdf;
+        specular_bounce = bsdf_sample->scatter_type.specular;
+        any_nonspecular_bounce |= !specular_bounce;
+        if (bsdf_sample->scatter_type.transmission) {
+            ior_scale *= bsdf_sample->ior;
+        }
+        last_p = si->point;
+        last_normal = si->normal;
+
+        ray = Ray(si->point, bsdf_sample->wi);
+        depth++;
+
+        // maybe terminate early (russian roulette)
+        float roulette_sample = sampler.sample_1d();
+        auto rr_weight = weight * ior_scale;
+        if (rr_weight.max_component() < 1.f && depth > 1) {
+            float q = std::max(0.0f, 1.0f - rr_weight.max_component());
+            if (roulette_sample < q) {
+                break;
+            }
+            weight /= 1.0f - q;
+        }
     }
 
-    return samples;
+    return pxs;
 }
 
 void render_pixels(
@@ -239,41 +202,6 @@ void render_pixels(
         RGB color{};
         Vec3 normal{};
         RGB albedo{};
-        #ifdef PACKET_SIZE
-        size_t n_chunks = n_samples / PACKET_SIZE;
-        size_t rem  = n_samples % PACKET_SIZE;
-        for (size_t chunk = 0; chunk < n_chunks; chunk++) {
-            std::array<Ray, PACKET_SIZE> rays;
-            std::array<WavelengthSample, PACKET_SIZE> wavelengths;
-            for (size_t ss = 0; ss < PACKET_SIZE; ss++) {
-                sampler.start_pixel_sample(x, y, chunk * PACKET_SIZE + ss);
-                auto jitter = sampler.sample_pixel_2d();
-                float u = float(x) + jitter.x;
-                float v = float(y) + jitter.y;
-                rays[ss] = camera.cast_ray(u, v);
-                float w = sampler.sample_1d();
-                wavelengths[ss] = WavelengthSample::uniform(w);
-            }
-            auto samples = sample_pixel(rays, scene, wavelengths, sampler, max_bounces);
-            for (size_t ss = 0; ss < PACKET_SIZE; ss++) {
-                color += camera.sensor.to_sensor_rgb(samples[ss].color, wavelengths[ss]);
-                albedo = camera.sensor.to_sensor_rgb(samples[ss].albedo, wavelengths[ss]);
-                normal += samples[ss].normal;
-            }
-        }
-        for (size_t s = 0; s < rem; s++) {
-            sampler.start_pixel_sample(x, y, n_chunks * 4 + s);
-            auto jitter = sampler.sample_pixel_2d();
-            float u = float(x) + jitter.x;
-            float v = float(y) + jitter.y;
-            Ray r = camera.cast_ray(u, v);
-            WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
-            auto sample = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
-            color += camera.sensor.to_sensor_rgb(sample.color, wavelengths);
-            albedo += camera.sensor.to_sensor_rgb(sample.albedo, wavelengths);
-            normal += sample.normal;
-        }
-        #else
         for (size_t s = 0; s < n_samples; s++) {
             sampler.start_pixel_sample(x, y, s);
             auto jitter = sampler.sample_pixel();
@@ -281,12 +209,12 @@ void render_pixels(
             float v = float(y) + jitter.y;
             Ray r = camera.cast_ray(u, v);
             WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
-            auto sample = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
-            color += camera.sensor.to_sensor_rgb(sample.color, wavelengths);
-            albedo += camera.sensor.to_sensor_rgb(sample.albedo, wavelengths);
-            normal += sample.normal;
+            auto pxs = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
+            color += camera.sensor.to_sensor_rgb(pxs.color, wavelengths);
+            albedo += camera.sensor.to_sensor_rgb(pxs.albedo, wavelengths);
+            normal += pxs.normal;
         }
-        #endif
+        
         color /= float(n_samples);
         albedo /= float(n_samples);
         normal /= float(n_samples);
@@ -337,31 +265,23 @@ RenderResult render(
         std::cout << "Scene must be committed before rendering." << std::endl;
         return result;
     }
-
-    // check that ray packet size is compatible with machine
-    #if PACKET_SIZE == 4
-    if (rtcGetDeviceProperty(scene.get_device(), RTC_DEVICE_PROPERTY_NATIVE_RAY4_SUPPORTED) == 0) {
-        std::cout << "Warning: packet size 4 selected but not supported" << std::endl;
-    }
-    #elif PACKET_SIZE == 8
-    if (rtcGetDeviceProperty(scene.get_device(), RTC_DEVICE_PROPERTY_NATIVE_RAY8_SUPPORTED) == 0) {
-        std::cout << "Warning: packet size 8 selected but not supported" << std::endl;
-    }
-    #endif
     
-    std::vector<std::thread> threads;
     size_t image_size = result.width * result.height;
+    Sampler sampler(n_samples, camera.image_width, camera.image_height, 0);
+
     #ifdef MULTITHREADED
+    std::vector<std::thread> threads;
     size_t n_threads = std::clamp<size_t>(
         std::thread::hardware_concurrency(),
         1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
     );
     std::cout << "Using " << n_threads << " threads" << std::endl;
 
-    std::vector<HaltonSampler> samplers;
+    // make a copy of the sampler for each thread
+    std::vector<Sampler> samplers;
     samplers.reserve(n_threads);
     for (size_t t = 0; t < n_threads; t++) {
-        samplers.push_back(HaltonSampler(n_samples, camera.image_width, camera.image_height, t));
+        samplers.push_back(sampler);
     }
 
     size_t end_index = 0;
@@ -394,7 +314,6 @@ RenderResult render(
     }
     #else
     // Single threaded render
-    HaltonSampler sampler(n_samples, camera.image_width, camera.image_height, 0);
     std::mutex _mutex;
     render_pixels(
         camera, scene, sampler, max_bounces,

@@ -25,6 +25,8 @@ public:
 
     void terminate_secondary();
 
+    float operator[](size_t i) const { return m_lambdas[i]; }
+
     bool operator==(const WavelengthSample& other) const;
 
     SampleArray m_lambdas;
@@ -51,6 +53,8 @@ public:
     float& operator[](size_t i) { return m_values[i]; }
 
     bool is_zero() const;
+
+    float max_component() const;
 
     // arithmetic operators
     SpectrumSample operator+(const SpectrumSample& other) const;
@@ -91,7 +95,7 @@ public:
     }
 
     // construct new spectrum from wavelengths pdf
-    static SpectrumSample from_wavelengths(const WavelengthSample& wavelengths);
+    static SpectrumSample from_wavelengths_pdf(const WavelengthSample& wavelengths);
 
     SampleArray m_values;
 };

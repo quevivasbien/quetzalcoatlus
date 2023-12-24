@@ -1,6 +1,6 @@
 #include "texture.hpp"
 
-SolidColor::SolidColor(const RGB& color, const RGBColorSpace& cs) : m_spectrum(std::make_shared<RGBUnboundedSpectrum>(color, cs)) {}
+SolidColor::SolidColor(const RGB& color, const RGBColorSpace& cs) : m_spectrum(std::make_shared<RGBSigmoidPolynomial>(cs.to_spectrum(color))) {}
 
 SpectrumSample SolidColor::value(
     const Vec2& uv,

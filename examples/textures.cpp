@@ -10,17 +10,17 @@
 int main() {
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(std::make_shared<RGBIlluminantSpectrum>(RGB(8., 4., 4.))));
-    scene.add_quad(
-        Pt3(-2.f, 5.f, -7.f),
-        Pt3(2.f, 5.f, -7.f),
-        Pt3(2.f, 3.f, 1.f),
-        Pt3(-2.f, 3.f, 1.f),
-        &light
-    );
+    // SimpleLight light(std::make_shared<RGBIlluminantSpectrum>(RGB(8., 4., 4.)));
+    // scene.add_quad(
+    //     Pt3(-2.f, 5.f, -7.f),
+    //     Pt3(2.f, 5.f, -7.f),
+    //     Pt3(2.f, 3.f, 1.f),
+    //     Pt3(-2.f, 3.f, 1.f),
+    //     nullptr, &light
+    // );
 
     // demonstrate dummy texture
-    LambertMaterial dummy(DummyTexture{});
+    DiffuseMaterial dummy(DummyTexture{});
     scene.add_sphere(
         Pt3(-1.25, 0., -5.), 1.,
         &dummy
@@ -43,7 +43,7 @@ int main() {
             image.color_buffer[3 * index + 2] = 1.f;
         }
     }
-    LambertMaterial image_material(ImageTexture(std::move(image)));
+    DiffuseMaterial image_material(ImageTexture(std::move(image)));
     scene.add_sphere(
         Pt3(1.25, 0., -5.), 1.,
         &image_material

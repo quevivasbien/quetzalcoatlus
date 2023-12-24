@@ -1,12 +1,16 @@
 target_sources(lib
     PRIVATE
+        bxdf.cpp
         camera.cpp
         image.cpp
-        random.cpp
+        material.cpp
+        light.cpp
         render.cpp
+        sampler.cpp
         scene.cpp
         texture.cpp
         transform.cpp
+        util.cpp
         vec.cpp
 )
 

@@ -7,20 +7,21 @@
 class OrthonormalBasis {
 public:
     // construct an orthonormal basis from a single vector
-    // note: n should be pre-normalized
+    // n need not be pre-normalized
     // n will be the new z axis
-    explicit OrthonormalBasis(const Vec3& n) {
+    explicit OrthonormalBasis(Vec3 n) {
+        n = n.normalize();
         float sign = n.z > 0.0f ? 1.0f : -1.0f;
         float a = -1.0f / (sign + n.z);
         float b = n.x * n.y * a;
         u[0] = Vec3(
-            1.0f + sign * n.x * n.x,
+            1.0f + sign * n.x * n.x * a,
             sign * b,
             -sign * n.x
         );
         u[1] = Vec3(
             b,
-            sign + n.y * n.y,
+            sign + n.y * n.y * a,
             -n.y
         );
         u[2] = n;
@@ -28,6 +29,14 @@ public:
 
     Vec3 from_local(const Vec3& v) const {
         return u[0] * v.x + u[1] * v.y + u[2] * v.z;
+    }
+
+    Vec3 to_local(const Vec3& v) const {
+        return Vec3(
+            u[0].dot(v),
+            u[1].dot(v),
+            u[2].dot(v)
+        );
     }
 
     Vec3 u[3];

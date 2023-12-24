@@ -66,6 +66,16 @@ bool SpectrumSample::is_zero() const {
     return true;
 }
 
+float SpectrumSample::max_component() const {
+    float max = m_values[0];
+    for (size_t i = 1; i < N_SPECTRUM_SAMPLES; ++i) {
+        if (m_values[i] > max) {
+            max = m_values[i];
+        }
+    }
+    return max;
+}
+
 
 SpectrumSample SpectrumSample::operator+(const SpectrumSample& other) const {
     SampleArray values;
@@ -200,6 +210,6 @@ float SpectrumSample::average() const {
 
 
 // construct new spectrum from wavelengths pdf
-SpectrumSample SpectrumSample::from_wavelengths(const WavelengthSample& wavelengths) {
+SpectrumSample SpectrumSample::from_wavelengths_pdf(const WavelengthSample& wavelengths) {
     return SpectrumSample(wavelengths.m_pdf);
 }

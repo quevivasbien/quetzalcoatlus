@@ -5,7 +5,7 @@
 
 int main(int argc, const char* const argv[]) {
     std::string filename;
-    Vec3 camera_position(0., 2.0, 7);
+    Vec3 camera_position(0., 2.0, 6);
     Vec3 camera_rotation(0., 0., 0.);
     if (argc < 2) {
         std::cerr << "Usage: program_name file_name [camera_x camera_y camera_z] [rotate_x rotate_y rotate_z]" << std::endl;
@@ -18,7 +18,7 @@ int main(int argc, const char* const argv[]) {
             camera_position = Vec3(std::stof(argv[2]), std::stof(argv[3]), std::stof(argv[4]));
         }
         else {
-            std::cerr << "No camera position provided, using (0, 2, 7)" << std::endl;
+            std::cerr << "No camera position provided, using (0, 2, 6)" << std::endl;
         }
         if (argc >= 7) {
             camera_rotation = Vec3(std::stof(argv[5]), std::stof(argv[6]), std::stof(argv[7]));
@@ -36,14 +36,37 @@ int main(int argc, const char* const argv[]) {
 
     Scene scene(initialize_device());
 
-    EmissiveMaterial light(SolidColor(spectra::ILLUM_D65()));
-    scene.add_plane(
-        Pt3(0., 100., 100.),
-        Vec3(0., -1., -1.).normalize(),
-        &light
-    );
-    LambertMaterial material(SolidColor(0.9, 0.7, 0.8));
+    auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0));
+    // scene.add_light(std::make_unique<AreaLight>(
+    //     std::make_unique<Quad>(
+    //         Pt3(4.f, 6.f, 8.f),
+    //         Vec3(2.f, 0.f, -2.f),
+    //         Vec3(0.f, 3.f, -3.f)
+    //     ),
+    //     light_spectrum,
+    //     8.0f
+    // ));
+    scene.add_light(std::make_unique<PointLight>(
+        Pt3(4., 6., 8.),
+        light_spectrum,
+        50.0f
+    ));
+
+    auto material = ConductiveMaterial::copper(0.05, 0.2);
     scene.add_obj(filename, &material);
+
+    DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));
+    scene.add_plane(
+        Pt3(0., -0.1, 0.),
+        Vec3(0., 1., 0.),
+        &floor
+    );
+    scene.add_plane(
+        Pt3(0., 0., -5.),
+        Vec3(0., 0., 1.),
+        &floor
+    );
+
     scene.commit();
 
     Transform camera_t =
@@ -52,10 +75,10 @@ int main(int argc, const char* const argv[]) {
         * Transform::rotate_y(camera_rotation.y)
         * Transform::rotate_z(camera_rotation.z);
     Camera camera(
-        1920, 1080, M_PI / 3.0,
+        1920 / 4, 1080 / 4, M_PI / 3.0,
         camera_t
     );
-    size_t n_samples = 16;
+    size_t n_samples = 32;
     size_t max_bounces = 64;
 
     auto result = render(camera, scene, n_samples, max_bounces);
@@ -65,6 +88,7 @@ int main(int argc, const char* const argv[]) {
 
     result.save_albedo(filename_base + "_albedo.png");
     result.save_normal(filename_base + "_normal.png");
+    result.save(filename_base + "_no_denoise.png");
 
     result.denoise();
     result.save(filename_base + ".png");
