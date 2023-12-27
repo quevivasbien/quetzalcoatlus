@@ -14,3 +14,4 @@ target_include_directories(lib
     PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 
 add_subdirectory(color)
+add_subdirectory(obj)

@@ -70,7 +70,7 @@ public:
     // plane is just a large square quad centered around the given point
     unsigned int add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
 
-    unsigned int add_obj(const std::string& filename, const Material* material);
+    std::vector<unsigned int> add_obj(const std::string& filename, const Material* material);
 
     std::optional<const GeometryData*> get_geom_data(unsigned int geom_id) const {
         const void* ptr = rtcGetGeometryUserDataFromScene(m_scene, geom_id);
