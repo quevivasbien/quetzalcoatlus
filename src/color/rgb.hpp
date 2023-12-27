@@ -9,6 +9,7 @@
 
 class RGB : public Vec3 {
 public:
+    RGB() : Vec3(0.0f, 0.0f, 0.0f) {}
     explicit RGB(Vec3&& v) : Vec3(std::move(v)) {}
     RGB(float r, float g, float b) : Vec3(r, g, b) {}
 };
@@ -17,6 +18,7 @@ public:
 // a polynomial that represents a spectrum of wavelengths
 class RGBSigmoidPolynomial : public Spectrum {
 public:
+    RGBSigmoidPolynomial() {}
     RGBSigmoidPolynomial(float c0, float c1, float c2) : c0(c0), c1(c1), c2(c2) {}
 
     float operator()(float lambda) const override;
@@ -50,7 +52,7 @@ public:
     RGB rgb_from_xyz(const XYZ& xyz) const;
     XYZ rgb_to_xyz(const RGB& rgb) const;
 
-    RGB rgb_from_sample(const SpectrumSample& ss) const;
+    RGB rgb_from_sample(const SpectrumSample& ss, const WavelengthSample& wl) const;
 
     RGBSigmoidPolynomial to_spectrum(const RGB& rgb) const;
 
@@ -58,19 +60,46 @@ public:
         return m_white;
     }
 
-    std::tuple<Vec2, Vec2, Vec2> bounds() const {
-        return {m_r, m_g, m_b};
-    }
-
     static std::shared_ptr<const RGBColorSpace> sRGB();
 
+    const Vec2 m_r;
+    const Vec2 m_g;
+    const Vec2 m_b;
+    const std::shared_ptr<const Spectrum> m_illuminant;
+    const std::shared_ptr<const RGBToSpectrumTable> m_table;
+
 private:
-    Vec2 m_r;
-    Vec2 m_g;
-    Vec2 m_b;
     Vec2 m_white;
     Mat3 m_xyz_from_rgb;
     Mat3 m_rgb_from_xyz;
-    std::shared_ptr<const Spectrum> m_illuminant;
-    std::shared_ptr<const RGBToSpectrumTable> m_table;
+};
+
+
+class RGBUnboundedSpectrum : public Spectrum {
+public:
+    RGBUnboundedSpectrum(const RGBSigmoidPolynomial& polynomial, float scale) : m_scale(scale), m_polynomial(polynomial) {};
+
+    explicit RGBUnboundedSpectrum(RGB rgb, const RGBColorSpace& cs = *RGBColorSpace::sRGB());
+    RGBUnboundedSpectrum(float r, float g, float b, const RGBColorSpace& cs = *RGBColorSpace::sRGB());
+
+    float operator()(float lambda) const override;
+
+private:
+    float m_scale;
+    RGBSigmoidPolynomial m_polynomial;
+};
+
+
+class RGBIlluminantSpectrum : public Spectrum {
+public:
+    explicit RGBIlluminantSpectrum(RGB rgb, const RGBColorSpace& cs = *RGBColorSpace::sRGB());
+    RGBIlluminantSpectrum(float r, float g, float b, const RGBColorSpace& cs = *RGBColorSpace::sRGB());
+
+    float operator()(float lambda) const override;
+
+    const std::shared_ptr<const Spectrum> m_illuminant;
+
+private:
+    float m_scale;
+    RGBSigmoidPolynomial m_polynomial;
 };

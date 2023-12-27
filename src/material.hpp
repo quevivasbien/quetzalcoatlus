@@ -1,146 +1,99 @@
 #pragma once
 
-#include "onb.hpp"
-#include "random.hpp"
+#include <algorithm>
+#include <cassert>
+
+#include "bxdf.hpp"
+#include "color/color.hpp"
+#include "sampler.hpp"
 #include "ray.hpp"
 #include "material.hpp"
 #include "texture.hpp"
 #include "vec.hpp"
 
-class Material;
-
-struct ShapeIntersection {
-    Vec2 uv;
-    Vec3 normal;
-    Pt3 point;
-    bool outer_face;
-
-    ShapeIntersection(Vec2 uv, Vec3 normal, Pt3 point, bool outer_face) : uv(uv), normal(normal), point(point), outer_face(outer_face) {}
-};
-
-
-struct ScatterEvent {
-    std::optional<Ray> new_ray;
-    Vec3 color;
-    float pdf;
-
-    ScatterEvent(std::optional<Ray> new_ray, Vec3 color, float pdf = 1.0f) : new_ray(new_ray), color(color), pdf(pdf) {}
-};
-
+struct SurfaceInteraction;
 
 class Material {
 public:
-    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const = 0;
+    virtual BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const = 0;
 };
 
 
-template <typename T>
-class LambertMaterial : public Material {
+class DiffuseMaterial : public Material {
 public:
-    explicit LambertMaterial(T&& texture) : texture(texture) {}
+    explicit DiffuseMaterial(std::unique_ptr<Texture>&& texture) : m_texture(std::move(texture)) {}
 
-    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
-        OrthonormalBasis onb(isect.normal);
-        Vec3 new_dir = onb.from_local(sampler.sample_cosine_hemisphere());
+    template <typename T>
+    explicit DiffuseMaterial(T&& texture) : m_texture(std::make_unique<T>(std::forward<T>(texture))) {}
 
-        Ray new_ray(isect.point, new_dir);
-        return ScatterEvent(
-            new_ray,
-            texture.value(isect.uv, isect.point),
-            sampler.cosine_hemisphere_pdf(onb.u[0].dot(new_dir))
-        );
-    }
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
 
-    T texture;
+    std::unique_ptr<Texture> m_texture;
 };
 
 
-template <typename T>
-class SpecularMaterial : public Material {
+class ConductiveMaterial : public Material {
 public:
-    SpecularMaterial(T texture, float roughness) : texture(texture), roughness(roughness) {}
+    ConductiveMaterial(float ior, float absorption) : m_ior(std::make_shared<ConstantSpectrum>(ior)), m_absorption(std::make_shared<ConstantSpectrum>(absorption)), m_roughness(0.0f, 0.0f) {}
 
-    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
-        Vec3 new_dir = ray.d.reflect(isect.normal);
-        if (roughness > 0.0f) {
-            new_dir += roughness * sampler.sample_uniform_sphere() * sampler.dist(sampler.rng);
-        }
+    ConductiveMaterial(
+        std::shared_ptr<const Spectrum> ior,
+        std::shared_ptr<const Spectrum> absorption,
+        TrowbridgeReitzDistribution roughness = TrowbridgeReitzDistribution(0.0f, 0.0f)
+    ) : m_ior(ior), m_absorption(absorption), m_roughness(roughness) {}
 
-        Ray new_ray(isect.point, new_dir);
-        return ScatterEvent(
-            new_ray,
-            texture.value(isect.uv, isect.point)
-        );
-    }
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
 
-    T texture;
-    float roughness;
+    static ConductiveMaterial alluminum(float roughness_a = 0.0f, float roughness_b = 0.0f);
+    static ConductiveMaterial copper(float roughness_a = 0.0f, float roughness_b = 0.0f);
+
+    std::shared_ptr<const Spectrum> m_ior;
+    std::shared_ptr<const Spectrum> m_absorption;
+    TrowbridgeReitzDistribution m_roughness;
 };
 
 
-template <typename T>
-class RefractiveMaterial : public Material {
+class DielectricMaterial : public Material {
 public:
-    RefractiveMaterial(T texture, float ior) : texture(texture), ior(ior) {}
+    explicit DielectricMaterial(float ior) : m_ior(std::make_shared<ConstantSpectrum>(ior)), is_constant(true) {}
 
-    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
-        float ior_ratio;
-        Vec3 normal;
-        if (isect.outer_face) {
-            ior_ratio = 1.0f / this->ior;
-            normal = isect.normal;
-        }
-        else {
-            ior_ratio = this->ior;
-            normal = -isect.normal;
-        }
+    explicit DielectricMaterial(std::shared_ptr<const Spectrum> ior) : m_ior(ior), is_constant(false) {}
 
-        float cos_theta = -normal.dot(ray.d);
-        Vec3 new_dir;
-        if (reflectance(cos_theta, ior_ratio) > sampler.dist(sampler.rng)) {
-            new_dir = ray.d.reflect(normal);
-        }
-        else {
-            new_dir = ray.d.normalize().refract(normal, ior_ratio);
-        }
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
 
-        return  ScatterEvent(
-            std::make_optional(Ray(isect.point, new_dir)),
-            texture.value(isect.uv, isect.point)
-        );
-    }
-
-    T texture;
-    float ior;
-
-private:
-    float reflectance(float cos_theta, float ior_ratio) const {
-        float r0 = (1.0f - ior_ratio) / (1.0f + ior_ratio);
-        r0 = r0 * r0;
-        return r0 + (1.0f - r0) * powf(1.0f - cos_theta, 5.0f);
-    }
+    bool is_constant;
+    std::shared_ptr<const Spectrum> m_ior;
 };
 
 
-template <typename T>
-class EmissiveMaterial : public Material {
+class ThinDielectricMaterial : public Material {
 public:
-    explicit EmissiveMaterial(T texture) : texture(texture) {}
+    explicit ThinDielectricMaterial(float ior) : m_ior(std::make_shared<ConstantSpectrum>(ior)), is_constant(true) {}
 
-    virtual ScatterEvent scatter(const Ray& ray, const ShapeIntersection& isect, Sampler& sampler) const override {
-        if (isect.outer_face) {
-            return ScatterEvent(
-                std::nullopt,
-                texture.value(isect.uv, isect.point)
-            );
-        }
-        else {
-            return ScatterEvent(
-                std::nullopt,
-                Vec3(0.f, 0.f, 0.f)
-            );
-        }
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
+
+    bool is_constant;
+    std::shared_ptr<Spectrum> m_ior;
+};
+
+
+template <size_t N>
+class MixedMaterial : public Material {
+public:
+    explicit MixedMaterial(std::array<std::unique_ptr<Material>, N>&& materials, std::array<float, N>&& weights) : m_materials(std::move(materials)), m_weights(std::move(weights)) {
+        float weight_sum = std::accumulate(m_weights.begin(), m_weights.end(), 0.0f);
+        assert(weight_sum > 0.0f);
+        // normalize weights to sum to 1
+        std::transform(m_weights.begin(), m_weights.end(), m_weights.begin(), [weight_sum](float w) {
+            return w / weight_sum;
+        });
+    }
+    
+    BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override {
+        size_t idx = sample * m_materials.size();
+        return m_materials[idx]->bsdf(si, wavelengths, sample);
     }
 
-    T texture;
+    std::array<std::unique_ptr<Material>, N> m_materials;
+    std::array<float, N> m_weights;
 };

@@ -73,14 +73,14 @@ void RenderResult::denoise(bool verbose) {
     // normalFilter.setImage("output", normalBuf, oidn::Format::Float3, width, height);
     // normalFilter.commit();
 
-    // // prefilter albedos
-    // oidn::FilterRef albedoFilter = device.newFilter("RT");
-    // albedoFilter.setImage("albedo", albedoBuf, oidn::Format::Float3, width, height);
-    // albedoFilter.setImage("output", albedoBuf, oidn::Format::Float3, width, height);
-    // albedoFilter.commit();
+    // prefilter albedos
+    oidn::FilterRef albedoFilter = device.newFilter("RT");
+    albedoFilter.setImage("albedo", albedoBuf, oidn::Format::Float3, width, height);
+    albedoFilter.setImage("output", albedoBuf, oidn::Format::Float3, width, height);
+    albedoFilter.commit();
 
     // normalFilter.execute();
-    // albedoFilter.execute();
+    albedoFilter.execute();
 
     filter.execute();
 
@@ -92,4 +92,14 @@ void RenderResult::denoise(bool verbose) {
     colorBuf.read(0, width * height * 3 * sizeof(float), color_buffer.data());
     normalBuf.read(0, width * height * 3 * sizeof(float), normal_buffer.data());
     albedoBuf.read(0, width * height * 3 * sizeof(float), albedo_buffer.data());
+}
+
+void RenderResult::save_normal(const std::string& filename) const {
+    Image normal_im(normal_buffer, height, width);
+    normal_im.save(filename);
+}
+
+void RenderResult::save_albedo(const std::string& filename) const {
+    Image albedo_im(albedo_buffer, height, width);
+    albedo_im.save(filename);
 }

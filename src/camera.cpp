@@ -4,8 +4,9 @@ Camera::Camera(
     size_t image_width,
     size_t image_height,
     float fov,
-    const Transform& transform
-) : image_width(image_width), image_height(image_height) {
+    const Transform& transform,
+    PixelSensor&& sensor
+) : image_width(image_width), image_height(image_height), sensor(sensor) {
     float viewport_height = 2.0f * tanf(fov * 0.5f);
     float viewport_width = viewport_height * float(image_width) / float(image_height);
 
