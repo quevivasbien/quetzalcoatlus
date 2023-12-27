@@ -265,101 +265,63 @@ GeometryData* Scene::add_sphere(const Pt3& center, float radius, const Material*
     return geom_data;
 }
 
-GeometryData* Scene::add_obj(const std::string& filename, const Material* material, const Transform& transform) {
-    // for now, only supports triangle meshes
-    std::vector<Pt3> vertices;
-    std::vector<std::array<unsigned int, 3>> faces;
-    // open file and read in vertices and faces
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cout << "Unable to open file" << std::endl;
-        return nullptr;
+std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Material* material) {
+    auto obj_data = obj::load_obj(filename);
+    if (!obj_data) {
+        return { };
     }
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.size() == 0 || line[0] == '#') {
-            continue;
-        }
-        auto first_space = line.find(' ');
-        if (first_space == std::string::npos) {
-            std::cout << "Unrecognized format in line: " << line << std::endl;
-            continue;
-        }
-        std::string first_word = line.substr(0, first_space);
-        if (first_word == "v") {
-            Pt3 v;
-            std::sscanf(line.c_str(), "v %f %f %f", &v.x, &v.y, &v.z);
-            vertices.push_back(transform * v);
-        }
-        else if (first_word == "f") {
-            std::array<unsigned int, 3> f;
-            if (line.find('/') == std::string::npos) {
-                std::sscanf(line.c_str(), "f %u %u %u", &f[0], &f[1], &f[2]);
+
+    std::vector<GeometryData*> geom_datas;
+
+    for (auto obj : obj_data->objects) {
+        RTCGeometry geom = rtcNewGeometry(
+            m_device,
+            RTC_GEOMETRY_TYPE_TRIANGLE
+        );
+        float* vertex_buf = static_cast<float*>(rtcSetNewGeometryBuffer(
+            geom,
+            RTC_BUFFER_TYPE_VERTEX,
+            0,
+            RTC_FORMAT_FLOAT3,
+            3 * sizeof(float),
+            obj.vertices.size()
+        ));
+        unsigned int* indices = static_cast<unsigned int*>(rtcSetNewGeometryBuffer(
+            geom,
+            RTC_BUFFER_TYPE_INDEX,
+            0,
+            RTC_FORMAT_UINT3,
+            3 * sizeof(unsigned int),
+            obj.faces.size()
+        ));
+
+        if (vertex_buf && indices) {
+            for (size_t i = 0; i < obj.vertices.size(); i++) {
+                vertex_buf[i * 3 + 0] = obj.vertices[i].x;
+                vertex_buf[i * 3 + 1] = obj.vertices[i].y;
+                vertex_buf[i * 3 + 2] = obj.vertices[i].z;
             }
-            else {
-                // try format f a/[at]/[an] b/[bt]/[bn] c/[ct]/[cn]
-                // only save a b c
-                unsigned int discard;
-                int count = std::sscanf(line.c_str(), "f %u/%u/%u %u/%u/%u %u/%u/%u", &f[0], &discard, &discard, &f[1], &discard, &discard, &f[2], &discard, &discard);
-                if (count < 9) {
-                    std::sscanf(line.c_str(), "f %u//%u %u//%u %u//%u", &f[0], &discard, &f[1], &discard, &f[2], &discard);
-                }
+            for (size_t i = 0; i < obj.faces.size(); i++) {
+                indices[i * 3 + 0] = obj.faces[i].vertices[0] - 1;
+                indices[i * 3 + 1] = obj.faces[i].vertices[1] - 1;
+                indices[i * 3 + 2] = obj.faces[i].vertices[2] - 1;
             }
-            faces.push_back(f);
         }
         else {
-            // std::cout << "Unrecognized format in line: " << line << std::endl;
-            continue;
+            printf("Something went wrong when making obj\n");
         }
+
+        m_geom_data.push_back({ Shape::OBJ, material });
+        GeometryData* geom_data = &m_geom_data.back();
+        rtcSetGeometryUserData(geom, geom_data);
+        geom_datas.push_back(geom_data);
+
+        rtcCommitGeometry(geom);
+        geom_ids.push_back(rtcAttachGeometry(m_scene, geom));
+        rtcReleaseGeometry(geom);
     }
-    file.close();
-
-    RTCGeometry geom = rtcNewGeometry(
-        m_device,
-        RTC_GEOMETRY_TYPE_TRIANGLE
-    );
-    float* vertex_buf = static_cast<float*>(rtcSetNewGeometryBuffer(
-        geom,
-        RTC_BUFFER_TYPE_VERTEX,
-        0,
-        RTC_FORMAT_FLOAT3,
-        3 * sizeof(float),
-        vertices.size()
-    ));
-    unsigned int* indices = static_cast<unsigned int*>(rtcSetNewGeometryBuffer(
-        geom,
-        RTC_BUFFER_TYPE_INDEX,
-        0,
-        RTC_FORMAT_UINT3,
-        3 * sizeof(unsigned int),
-        faces.size()
-    ));
-
-    if (vertex_buf && indices) {
-        for (size_t i = 0; i < vertices.size(); i++) {
-            vertex_buf[i * 3 + 0] = vertices[i].x;
-            vertex_buf[i * 3 + 1] = vertices[i].y;
-            vertex_buf[i * 3 + 2] = vertices[i].z;
-        }
-        for (size_t i = 0; i < faces.size(); i++) {
-            indices[i * 3 + 0] = faces[i][0] - 1;
-            indices[i * 3 + 1] = faces[i][1] - 1;
-            indices[i * 3 + 2] = faces[i][2] - 1;
-        }
-    }
-    else {
-        printf("Something went wrong when making obj\n");
-    }
-
-    m_geom_data.push_back({ ShapeType::OBJ, material });
-    GeometryData* geom_data = &m_geom_data.back();
-    rtcSetGeometryUserData(geom, geom_data);
-
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(m_scene, geom);
-    rtcReleaseGeometry(geom);
-
-    return geom_data;
+    
+    return geom_datas;
 }
 
 void Scene::add_light(std::unique_ptr<Light>&& light) { 

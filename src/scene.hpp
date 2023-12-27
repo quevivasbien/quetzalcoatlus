@@ -56,8 +56,8 @@ public:
     // plane is just a large square quad centered around the given point
     GeometryData* add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
 
-    GeometryData* add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
-
+    // add objects from .obj (wavefront OBJ) file
+    std::vector<GeometryData*> add_obj(const std::string& filename, const Material* material);
     // add a light to the scene
     void add_light(std::unique_ptr<Light>&& light);
 

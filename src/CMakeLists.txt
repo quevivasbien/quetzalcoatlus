@@ -19,3 +19,6 @@ target_include_directories(lib
 
 add_subdirectory(color)
 include_directories(color)
+
+add_subdirectory(obj)
+include_directories(obj)
