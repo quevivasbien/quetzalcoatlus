@@ -1,0 +1,1 @@
+target_sources(lib PRIVATE obj.cpp)

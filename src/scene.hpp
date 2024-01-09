@@ -57,7 +57,7 @@ public:
     GeometryData* add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
 
     // add objects from .obj (wavefront OBJ) file
-    std::vector<GeometryData*> add_obj(const std::string& filename, const Material* material);
+    std::vector<GeometryData*> add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
     // add a light to the scene
     void add_light(std::unique_ptr<Light>&& light);
 

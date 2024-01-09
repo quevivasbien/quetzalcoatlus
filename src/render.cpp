@@ -275,7 +275,7 @@ RenderResult render(
         std::thread::hardware_concurrency(),
         1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
     );
-    std::cout << "Using " << n_threads << " threads" << std::endl;
+    std::cout << "Rendering with " << n_threads << " threads" << std::endl;
 
     // make a copy of the sampler for each thread
     std::vector<Sampler> samplers;

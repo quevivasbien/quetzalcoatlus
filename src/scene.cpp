@@ -264,7 +264,7 @@ GeometryData* Scene::add_sphere(const Pt3& center, float radius, const Material*
     return geom_data;
 }
 
-std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Material* material) {
+std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Material* material, const Transform& transform) {
     auto obj_data = obj::load_obj(filename);
     if (!obj_data) {
         return { };
@@ -273,6 +273,9 @@ std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Mat
     std::vector<GeometryData*> geom_datas;
 
     for (auto obj : obj_data->objects) {
+        if (obj.vertices.empty() || obj.faces.empty()) {
+            continue;
+        }
         RTCGeometry geom = rtcNewGeometry(
             m_device,
             RTC_GEOMETRY_TYPE_TRIANGLE
@@ -296,9 +299,14 @@ std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Mat
 
         if (vertex_buf && indices) {
             for (size_t i = 0; i < obj.vertices.size(); i++) {
-                vertex_buf[i * 3 + 0] = obj.vertices[i].x;
-                vertex_buf[i * 3 + 1] = obj.vertices[i].y;
-                vertex_buf[i * 3 + 2] = obj.vertices[i].z;
+                Pt3 p = transform * Pt3(
+                    obj.vertices[i].x,
+                    obj.vertices[i].y,
+                    obj.vertices[i].z
+                );
+                vertex_buf[i * 3 + 0] = p.x;
+                vertex_buf[i * 3 + 1] = p.y;
+                vertex_buf[i * 3 + 2] = p.z;
             }
             for (size_t i = 0; i < obj.faces.size(); i++) {
                 indices[i * 3 + 0] = obj.faces[i].vertices[0] - 1;
@@ -308,6 +316,7 @@ std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Mat
         }
         else {
             std::cerr << "Something went wrong when making obj" << std::endl;
+            continue;
         }
 
         m_geom_data.push_back({ ShapeType::OBJ, material });

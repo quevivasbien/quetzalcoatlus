@@ -7,23 +7,30 @@ const std::string DEFAULT_FILE = "teapot.obj";
 
 int main(int argc, const char* const argv[]) {
     std::string filename;
-    Vec3 camera_position(0., 2.0, 6);
-    Vec3 camera_rotation(0., 0., 0.);
+    Vec3 position(0., 0., 0.);
+    float scale = 1.0;
+    Vec3 rotation(0., 0., 0.);
     if (argc < 2) {
-        std::cerr << "Usage: program_name file_name [camera_x camera_y camera_z] [rotate_x rotate_y rotate_z]" << std::endl;
+        std::cerr << "Usage: program_name file_name [camera_x camera_y camera_z] [scale] [rotate_x rotate_y rotate_z]" << std::endl;
         std::cerr << "No file provided, trying with file_name = " << DEFAULT_FILE << std::endl;
         filename = DEFAULT_FILE;
     }
     else {
         filename = argv[1];
         if (argc >= 4) {
-            camera_position = Vec3(std::stof(argv[2]), std::stof(argv[3]), std::stof(argv[4]));
+            position = Vec3(std::stof(argv[2]), std::stof(argv[3]), std::stof(argv[4]));
         }
         else {
-            std::cerr << "No camera position provided, using (0, 2, 6)" << std::endl;
+            std::cerr << "No camera position provided, using (0, 0, 0)" << std::endl;
         }
-        if (argc >= 7) {
-            camera_rotation = Vec3(std::stof(argv[5]), std::stof(argv[6]), std::stof(argv[7]));
+        if (argc >= 5) {
+            scale = std::stof(argv[5]);
+        }
+        else {
+            std::cerr << "No camera scale provided, using 1.0" << std::endl;
+        }
+        if (argc >= 8) {
+            rotation = Vec3(std::stof(argv[6]), std::stof(argv[7]), std::stof(argv[8]));
         }
         else {
             std::cerr << "No camera rotation provided, using (0, 0, 0)" << std::endl;
@@ -55,7 +62,13 @@ int main(int argc, const char* const argv[]) {
     ));
 
     auto material = ConductiveMaterial::copper(0.05, 0.2);
-    scene.add_obj(filename, &material);
+    Transform transform =
+        Transform::translation(position)
+        * Transform::rotate_x(rotation.x)
+        * Transform::rotate_y(rotation.y)
+        * Transform::rotate_z(rotation.z)
+        * Transform::scale(scale);
+    scene.add_obj(filename, &material, transform);
 
     DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));
     scene.add_plane(
@@ -71,14 +84,10 @@ int main(int argc, const char* const argv[]) {
 
     scene.commit();
 
-    Transform camera_t =
-        Transform::translation(camera_position)
-        * Transform::rotate_x(camera_rotation.x)
-        * Transform::rotate_y(camera_rotation.y)
-        * Transform::rotate_z(camera_rotation.z);
     Camera camera(
-        1920 / 4, 1080 / 4, M_PI / 3.0,
-        camera_t
+        1920, 1080, M_PI / 3.0,
+        Transform::translation(0., 4., 6.)
+        * Transform::rotate_x(-M_PI / 8.0)
     );
     size_t n_samples = 32;
     size_t max_bounces = 64;
