@@ -3,14 +3,16 @@
 #include <string>
 #include "render.hpp"
 
+const std::string DEFAULT_FILE = "teapot.obj";
+
 int main(int argc, const char* const argv[]) {
     std::string filename;
     Vec3 camera_position(0., 2.0, 6);
     Vec3 camera_rotation(0., 0., 0.);
     if (argc < 2) {
         std::cerr << "Usage: program_name file_name [camera_x camera_y camera_z] [rotate_x rotate_y rotate_z]" << std::endl;
-        std::cerr << "No file provided, trying with file_name = teapot.obj" << std::endl;
-        filename = "teapot.obj";
+        std::cerr << "No file provided, trying with file_name = " << DEFAULT_FILE << std::endl;
+        filename = DEFAULT_FILE;
     }
     else {
         filename = argv[1];

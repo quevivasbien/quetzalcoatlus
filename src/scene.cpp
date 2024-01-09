@@ -1,19 +1,18 @@
 #include <fstream>
 #include <vector>
 
+#include "obj/obj.hpp"
 #include "scene.hpp"
 
 void error_function(void* userPtr, enum RTCError error, const char* str)
 {
-    printf("error %d: %s\n", error, str);
+    std::cerr << "error: " << error << ": " << str << std::endl;
 }
 
 RTCDevice initialize_device() {
     RTCDevice device = rtcNewDevice(NULL);
     if (!device) {
-        printf(
-            "error %d: cannot create device\n", rtcGetDeviceError(NULL)
-        );
+        std::cerr << "error code " << rtcGetDeviceError(device) << ": cannot create device" << std::endl;
     }
 
     rtcSetDeviceErrorFunction(device, error_function, NULL);
@@ -153,7 +152,7 @@ GeometryData* Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, cons
         indices[2] = 2;
     }
     else {
-        printf("Something went wrong when making triangle\n");
+        std::cerr << "Something went wrong when making triangle" << std::endl;
     }
     m_geom_data.push_back({ ShapeType::TRIANGLE, material });
     GeometryData* geom_data = &m_geom_data.back();
@@ -206,7 +205,7 @@ GeometryData* Scene::add_quad(
         indices[3] = 3;
     }
     else {
-        printf("Something went wrong when making quad\n");
+        std::cerr << "Something went wrong when making quad" << std::endl;
     }
     m_geom_data.push_back({ ShapeType::QUAD, material });
     GeometryData* geom_data = &m_geom_data.back();
@@ -252,7 +251,7 @@ GeometryData* Scene::add_sphere(const Pt3& center, float radius, const Material*
         vertices[3] = radius;
     }
     else {
-        printf("Something went wrong when making sphere\n");
+        std::cerr << "Something went wrong when making sphere" << std::endl;
     }
     m_geom_data.push_back({ ShapeType::SPHERE, material });
     GeometryData* geom_data = &m_geom_data.back();
@@ -308,16 +307,16 @@ std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Mat
             }
         }
         else {
-            printf("Something went wrong when making obj\n");
+            std::cerr << "Something went wrong when making obj" << std::endl;
         }
 
-        m_geom_data.push_back({ Shape::OBJ, material });
+        m_geom_data.push_back({ ShapeType::OBJ, material });
         GeometryData* geom_data = &m_geom_data.back();
         rtcSetGeometryUserData(geom, geom_data);
         geom_datas.push_back(geom_data);
 
         rtcCommitGeometry(geom);
-        geom_ids.push_back(rtcAttachGeometry(m_scene, geom));
+        rtcAttachGeometry(m_scene, geom);
         rtcReleaseGeometry(geom);
     }
     
@@ -346,7 +345,8 @@ void Scene::add_light(std::unique_ptr<Light>&& light) {
             }
         }
         else {
-            std::cout << "Shape type not yet supported as an area light: " << shape->type() << std::endl;
+            std::cerr << "Shape type not yet supported as an area light: " << shape->type() << std::endl;
+            return;
         }
     }
     m_lights.push_back(std::move(light));
