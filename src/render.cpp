@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -183,6 +184,39 @@ PixelSample sample_pixel(
     return pxs;
 }
 
+struct ProgressBar {
+    size_t total;
+    size_t current = 0;
+    size_t width = 40;
+    std::mutex mutex;
+    
+    void display() {
+        std::cout << "[";
+        size_t pos = width * current / total;
+        for (size_t i = 0; i < width; i++) {
+            if (i < pos) {
+                std::cout << "=";
+            }
+            else if (i == pos) {
+                std::cout << ">";
+            }
+            else {
+                std::cout << " ";
+            }
+        }
+        std::cout << "] " << int(100.0 * current / total) << "%\r";
+        std::cout.flush();
+    }
+
+    void increment(int n = 1, bool display = true) {
+        std::lock_guard<std::mutex> lock(mutex);
+        current += n;
+        if (display) {
+            this->display();
+        }
+    }
+};
+
 void render_pixels(
     const Camera& camera,
     const Scene& scene,
@@ -192,7 +226,8 @@ void render_pixels(
     size_t start_index,
     size_t end_index,
     size_t& global_index,
-    std::mutex& mutex
+    std::mutex& mutex,
+    ProgressBar& progress_bar
 ) {
     int n_samples = sampler.samples_per_pixel();
     for (size_t i = start_index; i < end_index; i++) {
@@ -231,6 +266,7 @@ void render_pixels(
         result.albedo_buffer[i * 3 + 1] = albedo.y;
         result.albedo_buffer[i * 3 + 2] = albedo.z;
     }
+    progress_bar.increment(end_index - start_index);
 
     {
         std::lock_guard<std::mutex> lock(mutex);
@@ -250,7 +286,8 @@ void render_pixels(
         start_index,
         end_index,
         global_index,
-        mutex
+        mutex,
+        progress_bar
     );
 }
 
@@ -268,6 +305,9 @@ RenderResult render(
     
     size_t image_size = result.width * result.height;
     Sampler sampler(n_samples, camera.image_width, camera.image_height, 0);
+
+    ProgressBar progress_bar { .total = image_size };
+    auto start_time = std::chrono::steady_clock::now();
 
     #ifdef MULTITHREADED
     std::vector<std::thread> threads;
@@ -306,7 +346,8 @@ RenderResult render(
             start_index,
             end_index,
             std::ref(end_index),
-            std::ref(mutex)
+            std::ref(mutex),
+            std::ref(progress_bar)
         ));
     }
     for (auto& t : threads) {
@@ -317,9 +358,13 @@ RenderResult render(
     std::mutex _mutex;
     render_pixels(
         camera, scene, sampler, max_bounces,
-        result, 0, image_size, image_size, _mutex
+        result, 0, image_size, image_size, _mutex, progress_bar
     );
     #endif
+
+    auto end_time = std::chrono::steady_clock::now();
+    std::chrono::duration<float> duration = end_time - start_time;
+    std::cout << std::endl << "Render time: " << std::fixed << std::setprecision(3) <<duration << std::endl;
 
     return result;
 }

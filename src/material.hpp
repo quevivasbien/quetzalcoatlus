@@ -69,11 +69,13 @@ public:
 class ThinDielectricMaterial : public Material {
 public:
     explicit ThinDielectricMaterial(float ior) : m_ior(std::make_shared<ConstantSpectrum>(ior)), is_constant(true) {}
+    
+    explicit ThinDielectricMaterial(std::shared_ptr<const Spectrum> ior) : m_ior(ior), is_constant(false) {}
 
     BSDF bsdf(const SurfaceInteraction& si, WavelengthSample& wavelengths, float sample) const override;
 
     bool is_constant;
-    std::shared_ptr<Spectrum> m_ior;
+    std::shared_ptr<const Spectrum> m_ior;
 };
 
 

@@ -61,7 +61,7 @@ int main(int argc, const char* const argv[]) {
         50.0f
     ));
 
-    auto material = ConductiveMaterial::copper(0.05, 0.2);
+    auto material = ConductiveMaterial::copper(0.12, 0.2);
     Transform transform =
         Transform::translation(position)
         * Transform::rotate_x(rotation.x)

@@ -3,7 +3,9 @@
 #include <fstream>
 #include <iostream>
 
-#ifndef NO_BOOST
+#ifdef NO_BOOST
+#include <regex>
+#else
 #include <boost/regex.hpp>
 #endif
 
