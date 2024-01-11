@@ -36,51 +36,71 @@ std::optional<Vertex> Vertex::from_line(const std::string& line) {
 }
 
 std::optional<FaceElement> FaceElement::from_line(const std::string& line) {
-    regex::regex r_only_vert("f\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)");
+    regex::regex r_only_vert("f\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)(?:\\s+(\\d+))?");
     regex::smatch match;
     if (regex::regex_search(line, match, r_only_vert)) {
-        int x = std::stoi(match[1].str());
-        int y = std::stoi(match[2].str());
-        int z = std::stoi(match[3].str());
+        int a = std::stoi(match[1].str());
+        int b = std::stoi(match[2].str());
+        int c = std::stoi(match[3].str());
+        if (match[4].matched) {
+            int d = std::stoi(match[4].str());
+            return FaceElement {
+                .vertices = { a, b, c, d }
+            };
+        }
         return FaceElement {
-            .vertices = { x, y, z }
+            .vertices = { a, b, c }
         };
     }
-    regex::regex r_vert_tex("f\\s+(\\d+)/(\\d+)\\s+(\\d+)/(\\d+)\\s+(\\d+)/(\\d+)");
+    regex::regex r_vert_tex("f\\s+(\\d+)\\/(\\d+)\\s+(\\d+)\\/(\\d+)\\s+(\\d+)\\/(\\d+)(?:\\s+(\\d+)\\/(\\d+))?");
     if (regex::regex_search(line, match, r_vert_tex)) {
+        int va = std::stoi(match[1].str());
+        int ta = std::stoi(match[2].str());
+        int vb = std::stoi(match[3].str());
+        int tb = std::stoi(match[4].str());
+        int vc = std::stoi(match[5].str());
+        int tc = std::stoi(match[6].str());
+        if (match[7].matched) {
+            int vd = std::stoi(match[7].str());
+            int td = std::stoi(match[8].str());
+            return FaceElement {
+                .vertices = { va, vb, vc, vd },
+                .textures = { ta, tb, tc, td }
+            };
+        }
         return FaceElement {
-            .vertices = {
-                std::stoi(match[1].str()),
-                std::stoi(match[3].str()),
-                std::stoi(match[5].str())
-            },
-            .textures = {
-                std::stoi(match[2].str()),
-                std::stoi(match[4].str()),
-                std::stoi(match[6].str())
-            }
+            .vertices = { va, vb, vc },
+            .textures = { ta, tb, tc }
         };
     }
-    regex::regex r_vert_tex_norm("f\\s+(\\d+)/(\\d+)?/(\\d+)\\s+(\\d+)/(\\d+)?/(\\d+)\\s+(\\d+)/(\\d+)?/(\\d+)");
+    regex::regex r_vert_tex_norm("f\\s+(\\d+)\\/(\\d+)?\\/(\\d+)\\s+(\\d+)\\/(\\d+)?\\/(\\d+)\\s+(\\d+)\\/(\\d+)?\\/(\\d+)(?:\\s+(\\d+)\\/(\\d+)?\\/(\\d+))?");
     if (regex::regex_search(line, match, r_vert_tex_norm)) {
-        auto fe = FaceElement {
-            .vertices = {
-                std::stoi(match[1].str()),
-                std::stoi(match[4].str()),
-                std::stoi(match[7].str())
-            },
-            .normals = {
-                std::stoi(match[3].str()),
-                std::stoi(match[6].str()),
-                std::stoi(match[9].str())
-            }
-        };
+        int va = std::stoi(match[1].str());
+        int na = std::stoi(match[3].str());
+        int vb = std::stoi(match[4].str());
+        int nb = std::stoi(match[6].str());
+        int vc = std::stoi(match[7].str());
+        int nc = std::stoi(match[9].str());
+        FaceElement fe;
+        if (match[10].matched) {
+            int vd = std::stoi(match[10].str());
+            int nd = std::stoi(match[12].str());
+            fe.vertices = { va, vb, vc, vd };
+            fe.normals = { na, nb, nc, nd };
+        }
+        else {
+            fe.vertices = { va, vb, vc };
+            fe.normals = { na, nb, nc };
+        }
         if (match[2].matched && match[5].matched && match[8].matched) {
             fe.textures = {
                 std::stoi(match[2].str()),
                 std::stoi(match[5].str()),
                 std::stoi(match[8].str())
             };
+            if (match[11].matched) {
+                fe.textures.push_back(std::stoi(match[11].str()));
+            }
         }
         return fe;
     }

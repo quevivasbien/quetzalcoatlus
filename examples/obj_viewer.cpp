@@ -11,29 +11,29 @@ int main(int argc, const char* const argv[]) {
     float scale = 1.0;
     Vec3 rotation(0., 0., 0.);
     if (argc < 2) {
-        std::cerr << "Usage: program_name file_name [camera_x camera_y camera_z] [scale] [rotate_x rotate_y rotate_z]" << std::endl;
+        std::cerr << "Usage: program_name file_name [x y z] [scale] [rotate_x rotate_y rotate_z]" << std::endl;
         std::cerr << "No file provided, trying with file_name = " << DEFAULT_FILE << std::endl;
         filename = DEFAULT_FILE;
     }
     else {
         filename = argv[1];
-        if (argc >= 4) {
+        if (argc >= 5) {
             position = Vec3(std::stof(argv[2]), std::stof(argv[3]), std::stof(argv[4]));
         }
         else {
-            std::cerr << "No camera position provided, using (0, 0, 0)" << std::endl;
+            std::cerr << "No position provided, using (0, 0, 0)" << std::endl;
         }
-        if (argc >= 5) {
+        if (argc >= 6) {
             scale = std::stof(argv[5]);
         }
         else {
-            std::cerr << "No camera scale provided, using 1.0" << std::endl;
+            std::cerr << "No scale provided, using 1.0" << std::endl;
         }
-        if (argc >= 8) {
+        if (argc >= 9) {
             rotation = Vec3(std::stof(argv[6]), std::stof(argv[7]), std::stof(argv[8]));
         }
         else {
-            std::cerr << "No camera rotation provided, using (0, 0, 0)" << std::endl;
+            std::cerr << "No rotation provided, using (0, 0, 0)" << std::endl;
         }
     }
 
@@ -46,15 +46,6 @@ int main(int argc, const char* const argv[]) {
     Scene scene(initialize_device());
 
     auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0));
-    // scene.add_light(std::make_unique<AreaLight>(
-    //     std::make_unique<Quad>(
-    //         Pt3(4.f, 6.f, 8.f),
-    //         Vec3(2.f, 0.f, -2.f),
-    //         Vec3(0.f, 3.f, -3.f)
-    //     ),
-    //     light_spectrum,
-    //     8.0f
-    // ));
     scene.add_light(std::make_unique<PointLight>(
         Pt3(4., 6., 8.),
         light_spectrum,
@@ -62,6 +53,7 @@ int main(int argc, const char* const argv[]) {
     ));
 
     auto material = ConductiveMaterial::copper(0.12, 0.2);
+    // auto material = DielectricMaterial(spectra::GLASS_BK7_IOR());
     Transform transform =
         Transform::translation(position)
         * Transform::rotate_x(rotation.x)
@@ -85,7 +77,7 @@ int main(int argc, const char* const argv[]) {
     scene.commit();
 
     Camera camera(
-        1920, 1080, M_PI / 3.0,
+        1080, 1080, M_PI / 3.0,
         Transform::translation(0., 4., 6.)
         * Transform::rotate_x(-M_PI / 8.0)
     );

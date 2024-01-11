@@ -276,9 +276,10 @@ std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Mat
         if (obj.vertices.empty() || obj.faces.empty()) {
             continue;
         }
+        // use a quad mesh since the mesh may have both triangle and quad faces
         RTCGeometry geom = rtcNewGeometry(
             m_device,
-            RTC_GEOMETRY_TYPE_TRIANGLE
+            RTC_GEOMETRY_TYPE_QUAD
         );
         float* vertex_buf = static_cast<float*>(rtcSetNewGeometryBuffer(
             geom,
@@ -287,13 +288,13 @@ std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Mat
             RTC_FORMAT_FLOAT3,
             3 * sizeof(float),
             obj.vertices.size()
-        ));
+        )); 
         unsigned int* indices = static_cast<unsigned int*>(rtcSetNewGeometryBuffer(
             geom,
             RTC_BUFFER_TYPE_INDEX,
             0,
-            RTC_FORMAT_UINT3,
-            3 * sizeof(unsigned int),
+            RTC_FORMAT_UINT4,
+            4 * sizeof(unsigned int),
             obj.faces.size()
         ));
 
@@ -309,9 +310,17 @@ std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Mat
                 vertex_buf[i * 3 + 2] = p.z;
             }
             for (size_t i = 0; i < obj.faces.size(); i++) {
-                indices[i * 3 + 0] = obj.faces[i].vertices[0] - 1;
-                indices[i * 3 + 1] = obj.faces[i].vertices[1] - 1;
-                indices[i * 3 + 2] = obj.faces[i].vertices[2] - 1;
+                const auto& vertices = obj.faces[i].vertices;
+                indices[i * 4 + 0] = vertices[0] - 1;
+                indices[i * 4 + 1] = vertices[1] - 1;
+                indices[i * 4 + 2] = vertices[2] - 1;
+                if (vertices.size() == 4) {
+                    indices[i * 4 + 3] = vertices[3] - 1;
+                }
+                else {
+                    // embree documentation says to duplicate last vertex in this case
+                    indices[i * 4 + 3] = vertices[2] - 1;
+                }
             }
         }
         else {
