@@ -3,6 +3,10 @@
 
 #include "vec.hpp"
 
+std::string Vec3::str() const {
+    return std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(z);
+}
+
 const Vec3& Vec3::operator+() const {
     return *this;
 }

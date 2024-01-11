@@ -1,21 +1,10 @@
 #include "obj.hpp"
+#include "regex.hpp"
 
 #include <fstream>
 #include <iostream>
 
-#ifdef NO_BOOST
-#include <regex>
-#else
-#include <boost/regex.hpp>
-#endif
-
 namespace obj {
-
-#ifdef NO_BOOST
-namespace regex = std;
-#else
-namespace regex = boost;
-#endif
 
 std::optional<Vertex> Vertex::from_line(const std::string& line) {
     regex::regex r("v\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)(?:\\s+(\\S+))?");

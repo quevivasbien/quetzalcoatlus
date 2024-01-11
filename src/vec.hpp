@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string>
 
 class Vec3 {
 public:
@@ -16,6 +17,8 @@ public:
     float b() const {
         return z;
     }
+
+    std::string str() const;
 
     const Vec3& operator+() const;
     Vec3 operator-() const;

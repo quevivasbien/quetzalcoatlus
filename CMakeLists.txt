@@ -12,7 +12,7 @@ find_package(OpenImageDenoise 2.1 REQUIRED)
 find_package(embree 4.3 REQUIRED)
 
 # use boost for regex instead of regex in std lib since it is way faster
-find_package(Boost 1.70.0 COMPONENTS regex)
+find_package(Boost 1.70.0 COMPONENTS regex program_options)
 
 add_library(lib STATIC "")
 target_link_libraries(lib

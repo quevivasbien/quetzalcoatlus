@@ -3,43 +3,65 @@
 #include <string>
 #include "render.hpp"
 
+// just for command line options here
+#include <opencv2/opencv.hpp>
+
 const std::string DEFAULT_FILE = "teapot.obj";
 
 int main(int argc, const char* const argv[]) {
-    std::string filename;
-    Vec3 position(0., 0., 0.);
-    float scale = 1.0;
-    Vec3 rotation(0., 0., 0.);
-    if (argc < 2) {
-        std::cerr << "Usage: program_name file_name [x y z] [scale] [rotate_x rotate_y rotate_z]" << std::endl;
-        std::cerr << "No file provided, trying with file_name = " << DEFAULT_FILE << std::endl;
-        filename = DEFAULT_FILE;
+    cv::String keys =
+        "{help h usage ? | | Print this message.}"
+        "{@file           | " + DEFAULT_FILE + " | Input file.}"
+        "{x x_offset     | 0. | X offset.}"
+        "{y y_offset     | 0. | Y offset.}"
+        "{z z_offset     | 0. | Z offset.}"
+        "{s scale        | 1. | Scale.}"
+        "{rx x_rotation   | 0. | rotation about X axis.}"
+        "{ry y_rotation   | 0. | rotation about Y axis.}"
+        "{rz z_rotation   | 0. | rotation about Z axis.}"
+        "{width        | 800 | Image width.}"
+        "{height       | 600 | Image height.}"
+        "{m material | diffuse | Material type, one of diffuse, copper, alluminum, glass}"
+        ;
+    cv::CommandLineParser parser(argc, argv, keys);
+    if (parser.has("help")) {
+        parser.printMessage();
+        return 0;
+    }
+    std::string filename = parser.get<cv::String>(0);
+    Vec3 position;
+    position.x = parser.get<float>("x");
+    position.y = parser.get<float>("y");
+    position.z = parser.get<float>("z");
+    float scale = parser.get<float>("s");
+    Vec3 rotation;
+    rotation.x = parser.get<float>("rx");
+    rotation.y = parser.get<float>("ry");
+    rotation.z = parser.get<float>("rz");
+    int width = parser.get<int>("width");
+    int height = parser.get<int>("height");
+    std::string material_type = parser.get<std::string>("m");
+    
+    std::unique_ptr<Material> material;
+    if (material_type == "diffuse") {
+        material = std::make_unique<DiffuseMaterial>(SolidColor(0.6, 0.8, 0.8));
+    }
+    else if (material_type == "copper") {
+        material = std::make_unique<ConductiveMaterial>(ConductiveMaterial::copper(0.12, 0.2));
+    }
+    else if (material_type == "alluminum") {
+        material = std::make_unique<ConductiveMaterial>(ConductiveMaterial::alluminum(0.12, 0.2));
+    }
+    else if (material_type == "glass") {
+        material = std::make_unique<DielectricMaterial>(spectra::GLASS_BK7_IOR());
     }
     else {
-        filename = argv[1];
-        if (argc >= 5) {
-            position = Vec3(std::stof(argv[2]), std::stof(argv[3]), std::stof(argv[4]));
-        }
-        else {
-            std::cerr << "No position provided, using (0, 0, 0)" << std::endl;
-        }
-        if (argc >= 6) {
-            scale = std::stof(argv[5]);
-        }
-        else {
-            std::cerr << "No scale provided, using 1.0" << std::endl;
-        }
-        if (argc >= 9) {
-            rotation = Vec3(std::stof(argv[6]), std::stof(argv[7]), std::stof(argv[8]));
-        }
-        else {
-            std::cerr << "No rotation provided, using (0, 0, 0)" << std::endl;
-        }
+        std::cerr << "Unknown material type: " << material_type << std::endl;
+        return 1;
     }
 
-    // check that filename ends with .obj
-    if (filename.substr(filename.length() - 4) != ".obj") {
-        std::cerr << "File name must end with .obj" << std::endl;
+    if (!parser.check()) {
+        parser.printErrors();
         return 1;
     }
 
@@ -51,16 +73,13 @@ int main(int argc, const char* const argv[]) {
         light_spectrum,
         50.0f
     ));
-
-    auto material = ConductiveMaterial::copper(0.12, 0.2);
-    // auto material = DielectricMaterial(spectra::GLASS_BK7_IOR());
     Transform transform =
         Transform::translation(position)
         * Transform::rotate_x(rotation.x)
         * Transform::rotate_y(rotation.y)
         * Transform::rotate_z(rotation.z)
         * Transform::scale(scale);
-    scene.add_obj(filename, &material, transform);
+    scene.add_obj(filename, material.get(), transform);
 
     DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));
     scene.add_plane(
@@ -77,7 +96,7 @@ int main(int argc, const char* const argv[]) {
     scene.commit();
 
     Camera camera(
-        1080, 1080, M_PI / 3.0,
+        width, height, M_PI / 3.0,
         Transform::translation(0., 4., 6.)
         * Transform::rotate_x(-M_PI / 8.0)
     );
