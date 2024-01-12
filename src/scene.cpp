@@ -75,9 +75,28 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
         return std::nullopt;
     }
 
-    auto [shape, material, light] = *geom_data_opt.value();
-    Vec3 normal = Vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
+    auto [shape, material, light, normal_data] = *geom_data_opt.value();
     Vec2 uv(rayhit.hit.u, rayhit.hit.v);
+
+    Vec3 normal;
+    if (normal_data && shape == ShapeType::OBJ) {
+        auto face_indices = normal_data->faces[rayhit.hit.primID];
+        Vec3 v0 = normal_data->normals[face_indices[0]];
+        Vec3 v1 = normal_data->normals[face_indices[1]];
+        Vec3 v2 = normal_data->normals[face_indices[2]];
+        Vec3 v3 = normal_data->normals[face_indices[3]];
+        // use uv coordinates to interpolate over vertex normals
+        normal = (
+            (1.0f - uv.x) * (1.0f - uv.y) * v0
+            + uv.x * (1.0f - uv.y) * v1
+            + uv.x * uv.y * v2
+            + (1.0f - uv.x) * uv.y * v3
+        ).normalized();
+    }
+    else {
+        normal = Vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalized();
+    }
+
     if (shape == ShapeType::SPHERE) {
         // embree doesn't have uv coordinates for spheres
         // need to calculate this manually
@@ -86,7 +105,7 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
 
     return SurfaceInteraction(
         ray.at(rayhit.ray.tfar),
-        (-ray.d).normalize(),
+        (-ray.d).normalized(),
         normal,
         uv,
         material,
@@ -264,81 +283,90 @@ GeometryData* Scene::add_sphere(const Pt3& center, float radius, const Material*
     return geom_data;
 }
 
-std::vector<GeometryData*> Scene::add_obj(const std::string& filename, const Material* material, const Transform& transform) {
+GeometryData* Scene::add_obj(const std::string& filename, const Material* material, const Transform& transform) {
     auto obj_data = obj::load_obj(filename);
     if (!obj_data) {
-        return { };
+        std::cerr << "Failed to load " << filename << std::endl;
+        return nullptr;
+    }
+    auto obj = *obj_data;
+    if (obj.vertices.empty() || obj.faces.empty()) {
+        return nullptr;
+    }
+    // use a quad mesh since the mesh may have both triangle and quad faces
+    RTCGeometry geom = rtcNewGeometry(
+        m_device,
+        RTC_GEOMETRY_TYPE_QUAD
+    );
+    float* vertex_buf = static_cast<float*>(rtcSetNewGeometryBuffer(
+        geom,
+        RTC_BUFFER_TYPE_VERTEX,
+        0,
+        RTC_FORMAT_FLOAT3,
+        3 * sizeof(float),
+        obj.vertices.size()
+    )); 
+    unsigned int* indices = static_cast<unsigned int*>(rtcSetNewGeometryBuffer(
+        geom,
+        RTC_BUFFER_TYPE_INDEX,
+        0,
+        RTC_FORMAT_UINT4,
+        4 * sizeof(unsigned int),
+        obj.faces.size()
+    ));
+
+    if (!vertex_buf || !indices) {
+        std::cerr << "Failed to create buffers for " << filename << std::endl;
+        return nullptr;
     }
 
-    std::vector<GeometryData*> geom_datas;
-
-    for (auto obj : obj_data->objects) {
-        if (obj.vertices.empty() || obj.faces.empty()) {
-            continue;
-        }
-        // use a quad mesh since the mesh may have both triangle and quad faces
-        RTCGeometry geom = rtcNewGeometry(
-            m_device,
-            RTC_GEOMETRY_TYPE_QUAD
+    for (size_t i = 0; i < obj.vertices.size(); i++) {
+        Pt3 p = transform * Pt3(
+            obj.vertices[i].x,
+            obj.vertices[i].y,
+            obj.vertices[i].z
         );
-        float* vertex_buf = static_cast<float*>(rtcSetNewGeometryBuffer(
-            geom,
-            RTC_BUFFER_TYPE_VERTEX,
-            0,
-            RTC_FORMAT_FLOAT3,
-            3 * sizeof(float),
-            obj.vertices.size()
-        )); 
-        unsigned int* indices = static_cast<unsigned int*>(rtcSetNewGeometryBuffer(
-            geom,
-            RTC_BUFFER_TYPE_INDEX,
-            0,
-            RTC_FORMAT_UINT4,
-            4 * sizeof(unsigned int),
-            obj.faces.size()
-        ));
-
-        if (vertex_buf && indices) {
-            for (size_t i = 0; i < obj.vertices.size(); i++) {
-                Pt3 p = transform * Pt3(
-                    obj.vertices[i].x,
-                    obj.vertices[i].y,
-                    obj.vertices[i].z
-                );
-                vertex_buf[i * 3 + 0] = p.x;
-                vertex_buf[i * 3 + 1] = p.y;
-                vertex_buf[i * 3 + 2] = p.z;
-            }
-            for (size_t i = 0; i < obj.faces.size(); i++) {
-                const auto& vertices = obj.faces[i].vertices;
-                indices[i * 4 + 0] = vertices[0] - 1;
-                indices[i * 4 + 1] = vertices[1] - 1;
-                indices[i * 4 + 2] = vertices[2] - 1;
-                if (vertices.size() == 4) {
-                    indices[i * 4 + 3] = vertices[3] - 1;
-                }
-                else {
-                    // embree documentation says to duplicate last vertex in this case
-                    indices[i * 4 + 3] = vertices[2] - 1;
-                }
-            }
-        }
-        else {
-            std::cerr << "Something went wrong when making obj" << std::endl;
-            continue;
-        }
-
-        m_geom_data.push_back({ ShapeType::OBJ, material });
-        GeometryData* geom_data = &m_geom_data.back();
-        rtcSetGeometryUserData(geom, geom_data);
-        geom_datas.push_back(geom_data);
-
-        rtcCommitGeometry(geom);
-        rtcAttachGeometry(m_scene, geom);
-        rtcReleaseGeometry(geom);
+        vertex_buf[i * 3 + 0] = p.x;
+        vertex_buf[i * 3 + 1] = p.y;
+        vertex_buf[i * 3 + 2] = p.z;
     }
+
+    for (size_t i = 0; i < obj.faces.size(); i++) {
+        const auto& vertices = obj.faces[i].vertices;
+        indices[i * 4 + 0] = vertices[0] - 1;
+        indices[i * 4 + 1] = vertices[1] - 1;
+        indices[i * 4 + 2] = vertices[2] - 1;
+        // if the face is a tri, this last vertex will be a duplicate of the previous
+        indices[i * 4 + 3] = vertices[3] - 1;
+    }
+
+    std::optional<NormalData> normal_data = std::nullopt;
+    if (!obj.vertex_normals.empty()) {
+        std::vector<Vec3> normals(obj.vertex_normals.size());
+        std::transform(obj.vertex_normals.begin(), obj.vertex_normals.end(), normals.begin(), [](const auto& v) {
+            return Vec3(v.x, v.y, v.z);
+        });
+        std::vector<std::array<int, 4>> faces(obj.faces.size());
+        std::transform(obj.faces.begin(), obj.faces.end(), faces.begin(), [](const auto& f) {
+            auto ns = f.normals;
+            return std::array<int, 4> { ns[0] - 1, ns[1] - 1, ns[2] - 1, ns[3] - 1 };
+        });
+        normal_data = NormalData { std::move(normals), std::move(faces) };
+    }
+
+    m_geom_data.push_back({
+        .shape = ShapeType::OBJ,
+        .material = material,
+        .normals = std::move(normal_data)
+    });
+    GeometryData* geom_data = &m_geom_data.back();
+    rtcSetGeometryUserData(geom, geom_data);
+
+    rtcCommitGeometry(geom);
+    rtcAttachGeometry(m_scene, geom);
+    rtcReleaseGeometry(geom);
     
-    return geom_datas;
+    return geom_data;
 }
 
 void Scene::add_light(std::unique_ptr<Light>&& light) { 

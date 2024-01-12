@@ -10,7 +10,7 @@ public:
     // n need not be pre-normalized
     // n will be the new z axis
     explicit OrthonormalBasis(Vec3 n) {
-        n = n.normalize();
+        n = n.normalized();
         float sign = n.z > 0.0f ? 1.0f : -1.0f;
         float a = -1.0f / (sign + n.z);
         float b = n.x * n.y * a;

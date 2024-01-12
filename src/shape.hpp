@@ -39,7 +39,7 @@ public:
 class Quad : public Shape {
 public:
     Quad(const Pt3& p00, const Vec3& du, const Vec3& dv)
-        : m_p00(p00), m_du(du), m_dv(dv), m_normal(du.cross(dv).normalize()), m_area(du.cross(dv).norm()) {}
+        : m_p00(p00), m_du(du), m_dv(dv), m_normal(du.cross(dv).normalized()), m_area(du.cross(dv).norm()) {}
 
     ShapeSample sample_point(Vec2 sample2) const override {
         Pt3 p = m_p00 + m_du * sample2.x + m_dv * sample2.y;

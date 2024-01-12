@@ -19,10 +19,18 @@
 
 RTCDevice initialize_device();
 
+struct NormalData {
+    // buffer of normal vectors for each vertex
+    std::vector<Vec3> normals;
+    // for each face, indices in the 'normals' buffer
+    std::vector<std::array<int, 4>> faces;
+};
+
 struct GeometryData {
     ShapeType shape;
     const Material* material;
     const AreaLight* light;
+    std::optional<NormalData> normals;
 };
 
 class Scene {
@@ -57,7 +65,7 @@ public:
     GeometryData* add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
 
     // add objects from .obj (wavefront OBJ) file
-    std::vector<GeometryData*> add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
+    GeometryData* add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
     // add a light to the scene
     void add_light(std::unique_ptr<Light>&& light);
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #ifdef NO_BOOST
 #include <regex>
 namespace regex = std;

@@ -7,6 +7,10 @@ std::string Vec3::str() const {
     return std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(z);
 }
 
+bool Vec3::is_zero() const {
+    return x == 0 && y == 0 && z == 0;
+}
+
 const Vec3& Vec3::operator+() const {
     return *this;
 }
@@ -92,9 +96,17 @@ float Vec3::norm_squared() const {
     return x * x + y * y + z * z;
 }
 
-Vec3 Vec3::normalize() const {
+Vec3 Vec3::normalized() const {
     float n = norm();
     return Vec3(x / n, y / n, z / n);
+}
+
+Vec3& Vec3::normalize() {
+    float n = norm();
+    x /= n;
+    y /= n;
+    z /= n;
+    return *this;
 }
 
 float Vec3::dot(const Vec3 &v2) const {

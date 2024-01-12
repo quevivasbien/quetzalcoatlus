@@ -253,11 +253,11 @@ float TrowbridgeReitzDistribution::masking_shadowing(Vec3 wo, Vec3 wi) const {
 }
 
 Vec3 TrowbridgeReitzDistribution::sample(Vec3 w, Vec2 sample2) const {
-    Vec3 wh = Vec3(m_alpha_x * w.x, m_alpha_y * w.y, w.z).normalize();
+    Vec3 wh = Vec3(m_alpha_x * w.x, m_alpha_y * w.y, w.z).normalized();
     if (wh.z < 0.0f) {
         wh = -wh;
     }
-    Vec3 t1 = wh.z < 0.99999f ? Vec3(0.0f, 0.0f, 1.0f).cross(wh).normalize() : Vec3(1.0f, 0.0f, 0.0f);
+    Vec3 t1 = wh.z < 0.99999f ? Vec3(0.0f, 0.0f, 1.0f).cross(wh).normalized() : Vec3(1.0f, 0.0f, 0.0f);
     Vec3 t2 = wh.cross(t1);
     Vec2 p = Sampler::sample_uniform_disk_polar(sample2);
     float h = std::sqrt(1.0f - p.x * p.x);
@@ -268,7 +268,7 @@ Vec3 TrowbridgeReitzDistribution::sample(Vec3 w, Vec2 sample2) const {
         m_alpha_x * nh.x,
         m_alpha_y * nh.y,
         std::max(1e-6f, nh.z)
-    ).normalize();
+    ).normalized();
 }
 
 
@@ -285,7 +285,7 @@ SpectrumSample ConductorBxDF::operator()(Vec3 wo, Vec3 wi) const {
     if (wm.norm_squared() == 0.0f) {
         return SpectrumSample(0.0f);
     }
-    wm = wm.normalize();
+    wm = wm.normalized();
     auto fresnel_factor = dielectric_reflectance(std::abs(wo.dot(wm)), m_ior, m_absorption);
     return fresnel_factor * (m_roughness(wm) * m_roughness.masking_shadowing(wo, wi) / (4.0f * cos_theta_i * cos_theta_o));
 }
@@ -329,7 +329,7 @@ float ConductorBxDF::pdf(Vec3 wo, Vec3 wi) const {
     if (wm.norm_squared() == 0.0f) {
         return 0.0f;
     }
-    wm = wm.dot(Vec3(0.0f, 0.0f, 1.0f)) > 0.0f ? wm.normalize() : -wm.normalize();
+    wm = wm.dot(Vec3(0.0f, 0.0f, 1.0f)) > 0.0f ? wm.normalized() : -wm.normalized();
     return m_roughness(wo, wm) / (4.0f * std::abs(wo.dot(wm))); 
 }
 

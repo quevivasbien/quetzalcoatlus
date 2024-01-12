@@ -31,14 +31,14 @@ int main() {
     auto right_plane = ConductiveMaterial::copper(0.4, 0.2);
     scene.add_plane(
         Pt3(0., 0., -10.),
-        Vec3(-0.5, 0.5, 1.).normalize(),
+        Vec3(-0.5, 0.5, 1.).normalized(),
         &right_plane
     );
 
     auto left_plane = ConductiveMaterial::alluminum(0.3, 0.6);
     scene.add_plane(
         Pt3(0., 0., -10.),
-        Vec3(0.5, -0.5, 1.).normalize(),
+        Vec3(0.5, -0.5, 1.).normalized(),
         &left_plane
     );
 

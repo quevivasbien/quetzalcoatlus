@@ -20,6 +20,8 @@ public:
 
     std::string str() const;
 
+    bool is_zero() const;
+
     const Vec3& operator+() const;
     Vec3 operator-() const;
 
@@ -53,7 +55,10 @@ public:
     float norm() const;
     float norm_squared() const;
 
-    Vec3 normalize() const;
+    // return a new normalized vector
+    Vec3 normalized() const;
+    // normalize in place
+    Vec3& normalize();
 
     float dot(const Vec3 &v2) const;
 

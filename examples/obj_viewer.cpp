@@ -6,12 +6,10 @@
 // just for command line options here
 #include <opencv2/opencv.hpp>
 
-const std::string DEFAULT_FILE = "teapot.obj";
-
 int main(int argc, const char* const argv[]) {
     cv::String keys =
         "{help h usage ? | | Print this message.}"
-        "{@file           | " + DEFAULT_FILE + " | Input file.}"
+        "{@file           | test.obj | Input file.}"
         "{x x_offset     | 0. | X offset.}"
         "{y y_offset     | 0. | Y offset.}"
         "{z z_offset     | 0. | Z offset.}"
@@ -22,6 +20,8 @@ int main(int argc, const char* const argv[]) {
         "{width        | 800 | Image width.}"
         "{height       | 600 | Image height.}"
         "{m material | diffuse | Material type, one of diffuse, copper, alluminum, glass}"
+        "{n n_samples | 24 | number of samples per pixel.}"
+        "{b bounces | 32 | maximum number of ray bounces per pixel sample}"
         ;
     cv::CommandLineParser parser(argc, argv, keys);
     if (parser.has("help")) {
@@ -40,6 +40,8 @@ int main(int argc, const char* const argv[]) {
     rotation.z = parser.get<float>("rz");
     int width = parser.get<int>("width");
     int height = parser.get<int>("height");
+    int n_samples = parser.get<int>("n");
+    int max_bounces = parser.get<int>("b");
     std::string material_type = parser.get<std::string>("m");
     
     std::unique_ptr<Material> material;
@@ -100,8 +102,6 @@ int main(int argc, const char* const argv[]) {
         Transform::translation(0., 4., 6.)
         * Transform::rotate_x(-M_PI / 8.0)
     );
-    size_t n_samples = 32;
-    size_t max_bounces = 64;
 
     auto result = render(camera, scene, n_samples, max_bounces);
 

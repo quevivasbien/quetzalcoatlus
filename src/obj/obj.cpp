@@ -24,6 +24,20 @@ std::optional<Vertex> Vertex::from_line(const std::string& line) {
     return v;
 }
 
+std::optional<VertexNormal> VertexNormal::from_line(const std::string& line) {
+    regex::regex r("vn\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)");
+    regex::smatch match;
+    if (!regex::regex_search(line, match, r)) {
+        return std::nullopt;
+    }
+    float x = std::stof(match[1].str());
+    float y = std::stof(match[2].str());
+    float z = std::stof(match[3].str());
+    return VertexNormal {
+        x, y, z
+    };
+}
+
 std::optional<FaceElement> FaceElement::from_line(const std::string& line) {
     regex::regex r_only_vert("f\\s+(\\d+)\\s+(\\d+)\\s+(\\d+)(?:\\s+(\\d+))?");
     regex::smatch match;
@@ -34,11 +48,13 @@ std::optional<FaceElement> FaceElement::from_line(const std::string& line) {
         if (match[4].matched) {
             int d = std::stoi(match[4].str());
             return FaceElement {
-                .vertices = { a, b, c, d }
+                .vertices = { a, b, c, d },
+                .n_vertices = 4
             };
         }
         return FaceElement {
-            .vertices = { a, b, c }
+            .vertices = { a, b, c, c },
+            .n_vertices = 3
         };
     }
     regex::regex r_vert_tex("f\\s+(\\d+)\\/(\\d+)\\s+(\\d+)\\/(\\d+)\\s+(\\d+)\\/(\\d+)(?:\\s+(\\d+)\\/(\\d+))?");
@@ -54,12 +70,14 @@ std::optional<FaceElement> FaceElement::from_line(const std::string& line) {
             int td = std::stoi(match[8].str());
             return FaceElement {
                 .vertices = { va, vb, vc, vd },
-                .textures = { ta, tb, tc, td }
+                .textures = { ta, tb, tc, td },
+                .n_vertices = 4
             };
         }
         return FaceElement {
-            .vertices = { va, vb, vc },
-            .textures = { ta, tb, tc }
+            .vertices = { va, vb, vc, vc },
+            .textures = { ta, tb, tc, tc },
+            .n_vertices = 3
         };
     }
     regex::regex r_vert_tex_norm("f\\s+(\\d+)\\/(\\d+)?\\/(\\d+)\\s+(\\d+)\\/(\\d+)?\\/(\\d+)\\s+(\\d+)\\/(\\d+)?\\/(\\d+)(?:\\s+(\\d+)\\/(\\d+)?\\/(\\d+))?");
@@ -76,20 +94,20 @@ std::optional<FaceElement> FaceElement::from_line(const std::string& line) {
             int nd = std::stoi(match[12].str());
             fe.vertices = { va, vb, vc, vd };
             fe.normals = { na, nb, nc, nd };
+            fe.n_vertices = 4;
         }
         else {
-            fe.vertices = { va, vb, vc };
-            fe.normals = { na, nb, nc };
+            fe.vertices = { va, vb, vc, vc };
+            fe.normals = { na, nb, nc, nc };
+            fe.n_vertices = 3;
         }
         if (match[2].matched && match[5].matched && match[8].matched) {
             fe.textures = {
                 std::stoi(match[2].str()),
                 std::stoi(match[5].str()),
-                std::stoi(match[8].str())
+                std::stoi(match[8].str()),
+                match[11].matched ? std::stoi(match[11].str()) : 0
             };
-            if (match[11].matched) {
-                fe.textures.push_back(std::stoi(match[11].str()));
-            }
         }
         return fe;
     }
@@ -105,9 +123,7 @@ std::optional<ObjData> load_obj(const std::string& filename) {
     }
     std::string line;
     // TODO: allow textures and normals to be added afterward
-    ObjData obj_data { { Object { "default" } } };
-    std::vector<Object>& objects = obj_data.objects;
-    Object* current_obj = &objects.back();
+    ObjData obj_data;
     while(std::getline(file, line)) {
         regex::regex r_line_type("^\\S+");
         regex::smatch match;
@@ -135,19 +151,22 @@ std::optional<ObjData> load_obj(const std::string& filename) {
         if (line_type == "v") {
             auto vert = Vertex::from_line(line);
             if (vert) {
-                current_obj->vertices.push_back(*vert);
+                obj_data.vertices.push_back(*vert);
             }
         }
         // else if (line_type == "vt") {
         //     // ignore this for now
         // }
-        // else if (line_type == "vn") {
-        //     // ignore this for now
-        // }
+        else if (line_type == "vn") {
+            auto vert_norm = VertexNormal::from_line(line);
+            if (vert_norm) {
+                obj_data.vertex_normals.push_back(*vert_norm);
+            }
+        }
         else if (line_type == "f") {
             auto face = FaceElement::from_line(line);
             if (face) {
-                current_obj->faces.push_back(*face);
+                obj_data.faces.push_back(*face);
             }
         }
     }

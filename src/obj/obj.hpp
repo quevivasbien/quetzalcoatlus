@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <string>
 #include <vector>
@@ -15,22 +16,28 @@ struct Vertex {
     static std::optional<Vertex> from_line(const std::string& line);
 };
 
+struct VertexNormal {
+    float x;
+    float y;
+    float z;
+
+    static std::optional<VertexNormal> from_line(const std::string& line);
+};
+
 struct FaceElement {
-    std::vector<int> vertices;
-    std::vector<int> textures;
-    std::vector<int> normals;
+    std::array<int, 4> vertices;
+    std::array<int, 4> textures;
+    std::array<int, 4> normals;
+
+    size_t n_vertices;
 
     static std::optional<FaceElement> from_line(const std::string& line);
 };
 
-struct Object {
-    std::string name;
-    std::vector<Vertex> vertices;
-    std::vector<FaceElement> faces;
-};
-
 struct ObjData {
-    std::vector<Object> objects;
+    std::vector<Vertex> vertices;
+    std::vector<VertexNormal> vertex_normals;
+    std::vector<FaceElement> faces;
 };
 
 std::optional<ObjData> load_obj(const std::string& filename);
