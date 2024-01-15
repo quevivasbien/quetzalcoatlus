@@ -75,7 +75,11 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
         return std::nullopt;
     }
 
-    auto [shape, material, light, normal_data] = *geom_data_opt.value();
+    auto geom_data = geom_data_opt.value();
+    auto shape = geom_data->shape;
+    auto material = geom_data->material;
+    auto light = geom_data->light;
+    auto normal_data = geom_data->normals.get();
     Vec2 uv(rayhit.hit.u, rayhit.hit.v);
 
     Vec3 normal;
@@ -340,7 +344,7 @@ GeometryData* Scene::add_obj(const std::string& filename, const Material* materi
         indices[i * 4 + 3] = vertices[3] - 1;
     }
 
-    std::optional<NormalData> normal_data = std::nullopt;
+    std::unique_ptr<NormalData> normal_data;
     if (!obj.vertex_normals.empty()) {
         std::vector<Vec3> normals(obj.vertex_normals.size());
         std::transform(obj.vertex_normals.begin(), obj.vertex_normals.end(), normals.begin(), [](const auto& v) {
@@ -351,7 +355,7 @@ GeometryData* Scene::add_obj(const std::string& filename, const Material* materi
             auto ns = f.normals;
             return std::array<int, 4> { ns[0] - 1, ns[1] - 1, ns[2] - 1, ns[3] - 1 };
         });
-        normal_data = NormalData { std::move(normals), std::move(faces) };
+        normal_data = std::make_unique<NormalData>(std::move(normals), std::move(faces));
     }
 
     m_geom_data.push_back({

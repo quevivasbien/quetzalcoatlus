@@ -30,7 +30,7 @@ struct GeometryData {
     ShapeType shape;
     const Material* material;
     const AreaLight* light;
-    std::optional<NormalData> normals;
+    std::unique_ptr<NormalData> normals;
 };
 
 class Scene {
