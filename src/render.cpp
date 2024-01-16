@@ -86,6 +86,8 @@ SpectrumSample sample_lights(
     }
 }
 
+// the heavy lifting goes on here
+// computes a single sample on a single pixel
 PixelSample sample_pixel(
     Ray ray,
     const Scene& scene,
@@ -106,8 +108,10 @@ PixelSample sample_pixel(
         auto si = scene.ray_intersect(ray, wavelengths, sampler);
         // no intersection, add background and break
         if (!si) {
-            // ConstantSpectrum spec(1.);
-            // pxs.color += weight * SpectrumSample::from_spectrum(spec, wavelengths);
+            auto bg_light = scene.get_bg_light();
+            if (bg_light.spectrum) {
+                pxs.color += weight * SpectrumSample::from_spectrum(*bg_light.spectrum, wavelengths) * bg_light.scale;
+            }
             break;
         }
         if (depth == 0) {

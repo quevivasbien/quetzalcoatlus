@@ -19,6 +19,11 @@
 
 RTCDevice initialize_device();
 
+struct BackgroundLight {
+    std::shared_ptr<const Spectrum> spectrum;
+    float scale = 1.0f;
+};
+
 struct NormalData {
     // buffer of normal vectors for each vertex
     std::vector<Vec3> normals;
@@ -66,16 +71,17 @@ public:
 
     // add objects from .obj (wavefront OBJ) file
     GeometryData* add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
+
     // add a light to the scene
     void add_light(std::unique_ptr<Light>&& light);
 
-    std::optional<const GeometryData*> get_geom_data(unsigned int geom_id) const {
+    void set_bg_light(std::shared_ptr<const Spectrum> spectrum, float scale = 1.0f);
+
+    const GeometryData* get_geom_data(unsigned int geom_id) const {
         const void* ptr = rtcGetGeometryUserDataFromScene(m_scene, geom_id);
-        if (ptr == NULL) {
-            return std::nullopt;
-        }
         return static_cast<const GeometryData*>(ptr);
     }
+
     RTCScene get_scene() const {
         return m_scene;
     }
@@ -83,10 +89,13 @@ public:
         return m_device;
     }
 
+    const BackgroundLight& get_bg_light () const { return m_bg_light; }
 
 private:
     RTCScene m_scene;
     RTCDevice m_device;
+
+    BackgroundLight m_bg_light;
     // need to store data in a collection that doesn't reallocate on resize
     // since we'll be providing our geom objects with pointers to it
     std::deque<GeometryData> m_geom_data;

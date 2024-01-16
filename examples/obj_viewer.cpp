@@ -22,6 +22,8 @@ int main(int argc, const char* const argv[]) {
         "{m material | diffuse | Material type, one of diffuse, copper, alluminum, glass}"
         "{n n_samples | 24 | number of samples per pixel.}"
         "{b bounces | 32 | maximum number of ray bounces per pixel sample}"
+        "{nobg | | Do not render background.}"
+        "{light | point | Light type, one of point, ambient, area}"
         ;
     cv::CommandLineParser parser(argc, argv, keys);
     if (parser.has("help")) {
@@ -43,6 +45,8 @@ int main(int argc, const char* const argv[]) {
     int n_samples = parser.get<int>("n");
     int max_bounces = parser.get<int>("b");
     std::string material_type = parser.get<std::string>("m");
+    bool render_background = !parser.has("nobg");
+    std::string light_type = parser.get<std::string>("light");
     
     std::unique_ptr<Material> material;
     if (material_type == "diffuse") {
@@ -70,11 +74,33 @@ int main(int argc, const char* const argv[]) {
     Scene scene(initialize_device());
 
     auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0));
-    scene.add_light(std::make_unique<PointLight>(
-        Pt3(4., 6., 8.),
-        light_spectrum,
-        50.0f
-    ));
+    if (light_type == "ambient") {
+        scene.set_bg_light(light_spectrum, 0.2f);
+    }
+    else if (light_type == "point") {
+        scene.add_light(std::make_unique<PointLight>(
+            Pt3(4., 6., 8.),
+            light_spectrum,
+            50.0f
+        ));
+    }
+    else if (light_type == "area") {
+        scene.add_light(std::make_unique<AreaLight>(
+            std::make_unique<Quad>(
+                Pt3(4., 6., 8.),
+                Vec3(-0.5, 0., 0.5),
+                Vec3(0., 0.75, 0.)
+            ),
+            light_spectrum,
+            6.0f
+        ));
+    }
+    else {
+        std::cerr << "Unknown light type: " << light_type << std::endl;
+        return 1;
+    }
+    
+
     Transform transform =
         Transform::translation(position)
         * Transform::rotate_x(rotation.x)
@@ -84,16 +110,18 @@ int main(int argc, const char* const argv[]) {
     scene.add_obj(filename, material.get(), transform);
 
     DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));
-    scene.add_plane(
-        Pt3(0., -0.1, 0.),
-        Vec3(0., 1., 0.),
-        &floor
-    );
-    scene.add_plane(
-        Pt3(0., 0., -5.),
-        Vec3(0., 0., 1.),
-        &floor
-    );
+    if (render_background) {
+        scene.add_plane(
+            Pt3(0., -0.1, 0.),
+            Vec3(0., 1., 0.),
+            &floor
+        );
+        scene.add_plane(
+            Pt3(0., 0., -5.),
+            Vec3(0., 0., 1.),
+            &floor
+        );
+    }
 
     scene.commit();
 

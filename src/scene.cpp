@@ -69,13 +69,12 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
         return std::nullopt;
     }
 
-    auto geom_data_opt = get_geom_data(rayhit.hit.geomID);
-    if (!geom_data_opt) {
+    auto geom_data = get_geom_data(rayhit.hit.geomID);
+    if (!geom_data) {
         std::cout << "Geometry data not found for intersected object" << std::endl;
         return std::nullopt;
     }
 
-    auto geom_data = geom_data_opt.value();
     auto shape = geom_data->shape;
     auto material = geom_data->material;
     auto light = geom_data->light;
@@ -400,4 +399,9 @@ void Scene::add_light(std::unique_ptr<Light>&& light) {
         }
     }
     m_lights.push_back(std::move(light));
+}
+
+void Scene::set_bg_light(std::shared_ptr<const Spectrum> spectrum, float scale) {
+    m_bg_light.spectrum = spectrum;
+    m_bg_light.scale = scale;
 }
