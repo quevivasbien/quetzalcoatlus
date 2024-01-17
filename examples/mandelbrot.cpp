@@ -1,9 +1,11 @@
+#include <complex>
+
 #include "image.hpp"
 #include "render.hpp"
 
-const unsigned int MAX_ITERATIONS = 100;
-const unsigned int N_ROWS = 800;
-const unsigned int N_COLS = 800;
+const unsigned int MAX_ITERATIONS = 200;
+const unsigned int N_ROWS = 1200;
+const unsigned int N_COLS = 1200;
 
 const float X_MIN = -2.0f;
 const float X_MAX = 1.0f;
@@ -11,19 +13,14 @@ const float Y_MIN = -1.5f;
 const float Y_MAX = 1.5f;
 
 float mandel_iter(float x, float y) {
-    float zx = 0.0f;
-    float zy = 0.0f;
-    float zx2 = 0.0f;
-    float zy2 = 0.0f;
-    unsigned int i = 0;
-    while (zx2 + zy2 < 4.0f && i < MAX_ITERATIONS) {
-        zx2 = zx * zx;
-        zy2 = zy * zy;
-        zx = zx2 - zy2 + x;
-        zy = 2.0f * zx * zy + y;
+    std::complex<float> c(x, y);
+    std::complex<float> z(0.0f, 0.0f);
+    int i = 0;
+    while (i < MAX_ITERATIONS && std::norm(z) < 2.0f) {
+        z = z * z + c;
         i++;
     }
-    return std::pow(i / (float)MAX_ITERATIONS, 0.1);
+    return std::pow(i / (float)MAX_ITERATIONS, 0.05);
 }
 
 Image mandelbrot() {
@@ -48,18 +45,20 @@ int main() {
 
     Scene scene(initialize_device());
     scene.add_light(std::make_unique<PointLight>(
-        Pt3(0., 5., 5.),
+        Pt3(5., 4., 2.),
         std::make_shared<RGBIlluminantSpectrum>(RGB(8., 2., 4.)),
         60.0f
     ));
     scene.add_grid(image, &material, Transform::translation(0.5, 0., -5.) * Transform::rotate_x(-0.5));
     scene.commit();
 
-    Camera camera(400, 400, M_PI_4);
+    Camera camera(800, 800, M_PI_4);
 
-    auto result = render(camera, scene, 12, 12);
-    result.save("mandelbrot.png");
+    auto result = render(camera, scene, 32, 12);
+    result.save("mandelbrot_no_denoise.png");
     result.save_normal("mandelbrot_normals.png");
+    result.denoise();
+    result.save("mandelbrot.png");
 
     return 0;
 }
