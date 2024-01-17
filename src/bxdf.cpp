@@ -45,7 +45,7 @@ float sin_phi(Vec3 w) {
 }
 
 
-SpectrumSample BxDF::reflectance(Vec3 wo, Sampler& sampler, size_t n_samples) const {
+SpectrumSample BxDF::rho_hd(Vec3 wo, Sampler& sampler, size_t n_samples) const {
     SpectrumSample r(0.0f);
     for (size_t i = 0; i < n_samples; i++) {
         auto bs = sample(wo, sampler.sample_1d(), sampler.sample_2d());
@@ -56,7 +56,7 @@ SpectrumSample BxDF::reflectance(Vec3 wo, Sampler& sampler, size_t n_samples) co
     return r / float(n_samples);
 }
 
-SpectrumSample BxDF::reflectance(Sampler& sampler, size_t n_samples) const {
+SpectrumSample BxDF::rho_hh(Sampler& sampler, size_t n_samples) const {
     SpectrumSample r(0.0f);
     for (size_t i = 0; i < n_samples; i++) {
         Vec3 wo = sampler.sample_uniform_hemisphere();
@@ -104,12 +104,12 @@ float BSDF::pdf(Vec3 wo_render, Vec3 wi_render) const {
     return m_bxdf->pdf(wo, wi);
 }
 
-SpectrumSample BSDF::reflectance(Vec3 wo_render, Sampler& sampler, size_t n_samples) const {
-    return reflectance(local_from_render(wo_render), sampler, n_samples);
+SpectrumSample BSDF::rho_hd(Vec3 wo_render, Sampler& sampler, size_t n_samples) const {
+    return m_bxdf->rho_hd(local_from_render(wo_render), sampler, n_samples);
 }
 
-SpectrumSample BSDF::reflectance(Sampler& sampler, size_t n_samples) const {
-    return reflectance(sampler, n_samples);
+SpectrumSample BSDF::rho_hh(Sampler& sampler, size_t n_samples) const {
+    return m_bxdf->rho_hh(sampler, n_samples);
 }
 
 

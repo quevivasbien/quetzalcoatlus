@@ -7,6 +7,8 @@
 #include "sampler.hpp"
 #include "vec.hpp"
 
+float abs_cos_theta(Vec3 w);
+
 struct ScatterType {
     bool specular = false;
     bool transmission = false;
@@ -35,10 +37,41 @@ public:
     virtual float pdf(Vec3 wo, Vec3 wi) const = 0;
 
     // hemispherical-directional reflectance
-    SpectrumSample reflectance(Vec3 wo, Sampler& sampler, size_t n_samples) const;
+    SpectrumSample rho_hd(Vec3 wo, Sampler& sampler, size_t n_samples) const;
 
     // hemispherical-hemispherical reflectance
-    SpectrumSample reflectance(Sampler& sampler, size_t n_samples) const;
+    SpectrumSample rho_hh(Sampler& sampler, size_t n_samples) const;
+
+    // hemispherical-hemispherical reflectance with sample points provided
+    template <size_t N>
+    SpectrumSample rho_hd(Vec3 wo, const std::array<float, N>& uc, const std::array<Vec2, N>& u2) const {
+        SpectrumSample spec(0.0f);
+        for (size_t i = 0; i < N; i++) {
+            auto bs = sample(wo, uc[i], u2[i]);
+            if (bs) {
+                spec += bs->spec * abs_cos_theta(bs->wi) / bs->pdf;
+            }
+        }
+        return spec / float(N);
+    }
+
+    // hemispherical-hemispherical reflectance with sample points provided
+    template <size_t N>
+    SpectrumSample rho_hh(const std::array<Vec2, N>& u1, const std::array<float, N>& uc, const std::array<Vec2, N>& u2) const {
+        SpectrumSample spec(0.0f);
+        for (size_t i = 0; i < N; i++) {
+            Vec3 wo = Sampler::sample_uniform_hemisphere(u1[i]);
+            if (wo.z == 0.0f) {
+                continue;
+            }
+            float pdf_o = Sampler::uniform_hemisphere_pdf();
+            auto bs = sample(wo, uc[i], u2[i]);
+            if (bs) {
+                spec += bs->spec * abs_cos_theta(bs->wi) * abs_cos_theta(wo) / (pdf_o * bs->pdf);
+            }
+        }
+        return spec / (M_PI * float(N));
+    }
 
     virtual bool is_specular() const { return false; }
 };
@@ -58,9 +91,19 @@ public:
 
     float pdf(Vec3 wo_render, Vec3 wi_render) const;
 
-    SpectrumSample reflectance(Vec3 wo_render, Sampler& sampler, size_t n_samples) const;
+    SpectrumSample rho_hd(Vec3 wo_render, Sampler& sampler, size_t n_samples) const;
+    
+    template <size_t N>
+    SpectrumSample rho_hd(Vec3 wo_render, const std::array<float, N>& uc, const std::array<Vec2, N>& u2) const {
+        return m_bxdf->rho_hd(local_from_render(wo_render), uc, u2);
+    }
 
-    SpectrumSample reflectance(Sampler& sampler, size_t n_samples) const;
+    SpectrumSample rho_hh(Sampler& sampler, size_t n_samples) const;
+
+    template <size_t N>
+    SpectrumSample rho_hh(const std::array<Vec2, N>& u1, const std::array<float, N>& uc, const std::array<Vec2, N>& u2) const {
+        return m_bxdf->rho_hh(u1, uc, u2);
+    }
 
     bool is_specular() const { return m_bxdf->is_specular(); }
 

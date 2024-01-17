@@ -142,8 +142,31 @@ PixelSample sample_pixel(
         if (!bsdf) {
             // I think this might mess up sample depth
             // This should never happen now, but is something to pay attention to in the future
+            specular_bounce = true;
             ray = si->skip_intersection(ray);
             continue;
+        }
+
+        if (depth == 0) {
+            // sample albedo
+            const size_t N_ALBEDO_SAMPLES = 16;
+            const std::array<float, N_ALBEDO_SAMPLES> uc = {
+                0.75741637, 0.37870818, 0.7083487, 0.18935409, 0.9149363, 0.35417435,
+                0.5990858,  0.09467703, 0.8578725, 0.45746812, 0.686759,  0.17708716,
+                0.9674518,  0.2995429,  0.5083201, 0.047338516
+            };
+            const std::array<Vec2, N_ALBEDO_SAMPLES> u2 = {
+                Vec2(0.855985, 0.570367), Vec2(0.381823, 0.851844),
+                Vec2(0.285328, 0.764262), Vec2(0.733380, 0.114073),
+                Vec2(0.542663, 0.344465), Vec2(0.127274, 0.414848),
+                Vec2(0.964700, 0.947162), Vec2(0.594089, 0.643463),
+                Vec2(0.095109, 0.170369), Vec2(0.825444, 0.263359),
+                Vec2(0.429467, 0.454469), Vec2(0.244460, 0.816459),
+                Vec2(0.756135, 0.731258), Vec2(0.516165, 0.152852),
+                Vec2(0.180888, 0.214174), Vec2(0.898579, 0.503897)
+            };
+
+            pxs.albedo = bsdf->rho_hd(si->wo, uc, u2);
         }
         
         if (!bsdf->is_specular()) {
@@ -155,9 +178,9 @@ PixelSample sample_pixel(
         if (!bsdf_sample) {
             break;
         }
-        if (depth == 0) {
-            pxs.albedo = bsdf_sample->spec;
-        }
+        // if (depth == 0) {
+        //     pxs.albedo = bsdf_sample->spec;
+        // }
 
         weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(si->normal)) / bsdf_sample->pdf;
 

@@ -23,7 +23,7 @@ int main(int argc, const char* const argv[]) {
         "{n n_samples | 24 | number of samples per pixel.}"
         "{b bounces | 32 | maximum number of ray bounces per pixel sample}"
         "{nobg | | Do not render background.}"
-        "{light | point | Light type, one of point, ambient, area}"
+        "{l light | point | Light type, one of point, ambient, area}"
         ;
     cv::CommandLineParser parser(argc, argv, keys);
     if (parser.has("help")) {
@@ -73,7 +73,8 @@ int main(int argc, const char* const argv[]) {
 
     Scene scene(initialize_device());
 
-    auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0));
+    // auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0));
+    auto light_spectrum = spectra::ILLUM_D65();
     if (light_type == "ambient") {
         scene.set_bg_light(light_spectrum, 0.2f);
     }
@@ -81,7 +82,7 @@ int main(int argc, const char* const argv[]) {
         scene.add_light(std::make_unique<PointLight>(
             Pt3(4., 6., 8.),
             light_spectrum,
-            50.0f
+            100.0f
         ));
     }
     else if (light_type == "area") {
@@ -92,7 +93,7 @@ int main(int argc, const char* const argv[]) {
                 Vec3(0., 0.75, 0.)
             ),
             light_spectrum,
-            6.0f
+            14.0f
         ));
     }
     else {
