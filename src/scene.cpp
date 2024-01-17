@@ -372,6 +372,63 @@ GeometryData* Scene::add_obj(const std::string& filename, const Material* materi
     return geom_data;
 }
 
+GeometryData* Scene::add_grid(const Image& image, const Material* material, const Transform& transform) {
+    auto geom = rtcNewGeometry(m_device, RTC_GEOMETRY_TYPE_GRID);
+    float* vertex_buf = static_cast<float*>(rtcSetNewGeometryBuffer(
+        geom,
+        RTC_BUFFER_TYPE_VERTEX,
+        0,
+        RTC_FORMAT_FLOAT3,
+        3 * sizeof(float),
+        image.width * image.height
+    ));
+    RTCGrid* grid = static_cast<RTCGrid*>(rtcSetNewGeometryBuffer(
+        geom,
+        RTC_BUFFER_TYPE_GRID,
+        0,
+        RTC_FORMAT_GRID,
+        sizeof(RTCGrid),
+        1
+    ));
+    if (!vertex_buf || !grid) {
+        std::cerr << "Failed to create buffers for grid" << std::endl;
+        return nullptr;
+    }
+    for (size_t i = 0; i < image.width * image.height; i++) {
+        Pt3 p = transform * Pt3(
+            image.color_buffer[i * 3 + 0],
+            image.color_buffer[i * 3 + 1],
+            image.color_buffer[i * 3 + 2]
+        );
+        vertex_buf[i * 3 + 0] = p.x;
+        vertex_buf[i * 3 + 1] = p.y;
+        vertex_buf[i * 3 + 2] = p.z;
+    }
+    if (image.width > std::numeric_limits<unsigned short>::max() || image.height > std::numeric_limits<unsigned short>::max()) {
+        std::cerr << "Grid too large" << std::endl;
+        return nullptr;
+    }
+    grid[0] = RTCGrid {
+        .startVertexID = 0,
+        .stride = static_cast<unsigned int>(image.width),
+        .width = static_cast<unsigned short>(image.width),
+        .height = static_cast<unsigned short>(image.height)
+    };
+
+    m_geom_data.push_back({
+        .shape = ShapeType::GRID,
+        .material = material
+    });
+    GeometryData* geom_data = &m_geom_data.back();
+    rtcSetGeometryUserData(geom, geom_data);
+
+    rtcCommitGeometry(geom);
+    rtcAttachGeometry(m_scene, geom);
+    rtcReleaseGeometry(geom);
+
+    return geom_data;
+}
+
 void Scene::add_light(std::unique_ptr<Light>&& light) { 
     if (light->type() == LightType::AREA) {
         // add the light's geometry to the scene

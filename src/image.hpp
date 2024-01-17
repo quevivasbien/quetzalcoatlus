@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 
+// a rectangular grid of pixels
+// used to store textures and render results
 class Image {
 public:
     Image(size_t height, size_t width) : height(height), width(width), color_buffer(height * width * 3) {}
@@ -20,6 +22,7 @@ public:
     std::vector<float> color_buffer;
 };
 
+// special version of Image that stores normal and albedo data
 class RenderResult : public Image {
 public:
     RenderResult(size_t height, size_t width) : Image(height, width), normal_buffer(height * width * 3), albedo_buffer(height * width * 3) {}

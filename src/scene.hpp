@@ -10,6 +10,7 @@
 #include <embree4/rtcore.h>
 
 #include "color/color.hpp"
+#include "image.hpp"
 #include "interaction.hpp"
 #include "light.hpp"
 #include "material.hpp"
@@ -72,9 +73,12 @@ public:
     // add objects from .obj (wavefront OBJ) file
     GeometryData* add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
 
+    GeometryData* add_grid(const Image& image, const Material* material, const Transform& transform = Transform::identity());
+
     // add a light to the scene
     void add_light(std::unique_ptr<Light>&& light);
 
+    // set properties of background (ambient) lighting
     void set_bg_light(std::shared_ptr<const Spectrum> spectrum, float scale = 1.0f);
 
     const GeometryData* get_geom_data(unsigned int geom_id) const {

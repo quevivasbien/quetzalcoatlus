@@ -1,5 +1,4 @@
 #include <iostream>
-#include <chrono>
 
 #include "camera.hpp"
 #include "image.hpp"
@@ -10,14 +9,13 @@
 int main() {
     Scene scene(initialize_device());
 
-    // SimpleLight light(std::make_shared<RGBIlluminantSpectrum>(RGB(8., 4., 4.)));
-    // scene.add_quad(
-    //     Pt3(-2.f, 5.f, -7.f),
-    //     Pt3(2.f, 5.f, -7.f),
-    //     Pt3(2.f, 3.f, 1.f),
-    //     Pt3(-2.f, 3.f, 1.f),
-    //     nullptr, &light
-    // );
+    scene.add_light(
+        std::make_unique<PointLight>(
+            Pt3(0., 5., 5.),
+            std::make_shared<RGBIlluminantSpectrum>(RGB(8., 2., 4.)),
+            60.0f
+        )
+    );
 
     // demonstrate dummy texture
     DiffuseMaterial dummy(DummyTexture{});
@@ -25,11 +23,23 @@ int main() {
         Pt3(-1.25, 0., -5.), 1.,
         &dummy
     );
-    scene.add_quad(
-        Pt3(-2.f, -2.f, -3.f),
-        Pt3(2.f, -2.f, -3.f),
-        Pt3(2.f, -2.f, -7.f),
-        Pt3(-2.f, -2.f, -7.f),
+    scene.add_grid(
+        Image(
+            {
+                -2, -2, -3,
+                0, -2.8, -3,
+                2, -2, -3,
+
+                -2, -2, -5,
+                0, -2.6, -5,
+                2, -2, -5,
+
+                -2, -2, -7,
+                0, -2, -7,
+                2, -2, -7
+            },
+            3, 3
+        ),
         &dummy
     );
 
@@ -56,7 +66,6 @@ int main() {
         &image_material
     );
 
-    
     scene.commit();
 
     Camera camera(
@@ -68,18 +77,13 @@ int main() {
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
         n_samples << " samples and " << max_bounces << " bounces" << std::endl;
 
-    auto start_time = std::chrono::steady_clock::now();
     auto result = render(
         camera,
         scene,
         n_samples, max_bounces
     );
-    auto end_time = std::chrono::steady_clock::now();
-    std::cout << "Render time: " <<
-        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() <<
-        "ms" << std::endl;
 
-
+    result.save("textures_demo_no_denoise.png");
     result.save_albedo("textures_demo_albedo.png");
     result.save_normal("textures_demo_normal.png");
 

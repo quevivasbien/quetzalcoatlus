@@ -10,7 +10,8 @@ enum ShapeType {
     SPHERE,
     TRIANGLE,
     QUAD,
-    OBJ
+    OBJ,
+    GRID
 };
 
 struct ShapeSample {
