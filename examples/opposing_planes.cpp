@@ -10,12 +10,12 @@ int main() {
     // scene.add_light(std::make_unique<PointLight>(
     //     Pt3(-2., -1., 1.),
     //     std::make_shared<RGBIlluminantSpectrum>(RGB(6.0, 0.2, 0.2)),
-    //     20.0f
+    //     40.0f
     // ));
     // scene.add_light(std::make_unique<PointLight>(
     //     Pt3(-2., 1., 1.),
     //     std::make_shared<RGBIlluminantSpectrum>(RGB(0.2, 0.2, 6.0)),
-    //     20.0f
+    //     60.0f
     // ));
     scene.add_light(std::make_unique<AreaLight>(
         std::make_unique<Quad>(
@@ -23,7 +23,7 @@ int main() {
             Vec3(0, 12, 2),
             Vec3(12, 0, 0)
         ),
-        std::make_shared<RGBIlluminantSpectrum>(RGB(2.0, 1.0, 2.0)),
+        std::make_shared<RGBIlluminantSpectrum>(RGB(2.5, 0.9, 1.8)),
         2.0f
     ));
 
@@ -56,7 +56,7 @@ int main() {
     );
     scene.commit();
 
-    Camera camera(1920, 1080, M_PI_4);
+    Camera camera(1920 * 2, 1080 * 2, M_PI_4);
     size_t n_samples = 256;
     size_t max_bounces = 64;
 

@@ -19,3 +19,4 @@ target_include_directories(lib
 
 add_subdirectory(color)
 add_subdirectory(obj)
+add_subdirectory(scattering)

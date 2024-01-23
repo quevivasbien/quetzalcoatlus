@@ -1,26 +1,24 @@
 #pragma once
 
+#include <optional>
+
 #include "bxdf.hpp"
 #include "light.hpp"
 #include "material.hpp"
+#include "scattering/medium.hpp"
 #include "vec.hpp"
 
-struct Interaction {
-    Pt3 point;
-    Vec3 wo;
-    Vec3 normal;
-    Vec2 uv;
-};
+struct SurfaceInteraction {
 
-struct SurfaceInteraction : public Interaction {
     SurfaceInteraction(
         const Pt3& point,
         const Vec3& wo,
         const Vec3& normal,
         const Vec2& uv,
-        const Material* material,
-        const AreaLight* light
-    ) : Interaction { point, wo, normal, uv }, material(material), light(light) {}
+        const Material* material = nullptr,
+        const AreaLight* light = nullptr,
+        const std::optional<MediumInterface>& medium_interface = std::nullopt
+    ) : point(point), wo(wo), normal(normal), uv(uv), material(material), light(light), medium_interface(medium_interface) {}
 
     std::optional<BSDF> bsdf(const Ray& ray, WavelengthSample& wavelengths, float sample) const {
         if (!material) {
@@ -40,6 +38,26 @@ struct SurfaceInteraction : public Interaction {
         return Ray(point, ray.d);
     }
 
-    const Material* material;
-    const Light* light;
+    // returns the medium that the unit vector w is coming from / going into
+    const Medium* get_medium(Vec3 w) const {
+        if (medium_interface) {
+            return w.dot(normal) > 0.0f ? medium_interface->outside : medium_interface->inside;
+        }
+        return nullptr;
+    }
+
+    const Medium* get_medium() const {
+        if (medium_interface) {
+            return medium_interface->inside;
+        }
+        return nullptr;
+    }
+
+    Pt3 point;
+    Vec3 wo;
+    Vec3 normal;
+    Vec2 uv;
+    const Material* material = nullptr;
+    const Light* light = nullptr;
+    std::optional<MediumInterface> medium_interface = std::nullopt;
 };
