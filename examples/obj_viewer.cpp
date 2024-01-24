@@ -108,7 +108,7 @@ int main(int argc, const char* const argv[]) {
         * Transform::rotate_y(rotation.y)
         * Transform::rotate_z(rotation.z)
         * Transform::scale(scale);
-    scene.add_obj(filename, material.get(), transform);
+    scene.add_obj(filename, material.get(), std::nullopt, transform);
 
     DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));
     if (render_background) {

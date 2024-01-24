@@ -118,7 +118,7 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
 }
 
 std::pair<const Light*, float> Scene::sample_lights(
-    const Pt3& point, const Vec3& normal,
+    const Pt3& point,
     Sampler& sampler
 ) const {
     if (m_lights.empty()) {
@@ -143,7 +143,11 @@ bool Scene::occluded(Pt3 start, Pt3 end) const {
     return rayhit.ray.tfar <= 1.0f;
 }
 
-GeometryData* Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material) {
+GeometryData* Scene::add_triangle(
+    const Pt3& a, const Pt3& b, const Pt3& c,
+    const Material* material,
+    const std::optional<MediumInterface>& medium_interface
+) {
     RTCGeometry geom = rtcNewGeometry(
         m_device,
         RTC_GEOMETRY_TYPE_TRIANGLE
@@ -177,7 +181,11 @@ GeometryData* Scene::add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, cons
     else {
         std::cerr << "Something went wrong when making triangle" << std::endl;
     }
-    m_geom_data.push_back({ ShapeType::TRIANGLE, material });
+    m_geom_data.push_back({
+        .shape = ShapeType::TRIANGLE,
+        .material = material,
+        .medium_interface = medium_interface
+    });
     GeometryData* geom_data = &m_geom_data.back();
     rtcSetGeometryUserData(geom, geom_data);
 
@@ -193,7 +201,8 @@ GeometryData* Scene::add_quad(
     const Pt3& b,
     const Pt3& c,
     const Pt3& d,
-    const Material* material
+    const Material* material,
+    const std::optional<MediumInterface>& medium_interface
 ) {
     RTCGeometry geom = rtcNewGeometry(
         m_device,
@@ -230,7 +239,11 @@ GeometryData* Scene::add_quad(
     else {
         std::cerr << "Something went wrong when making quad" << std::endl;
     }
-    m_geom_data.push_back({ ShapeType::QUAD, material });
+    m_geom_data.push_back({
+        .shape = ShapeType::QUAD,
+        .material = material,
+        .medium_interface = medium_interface
+    });
     GeometryData* geom_data = &m_geom_data.back();
     rtcSetGeometryUserData(geom, geom_data);
 
@@ -241,7 +254,12 @@ GeometryData* Scene::add_quad(
     return geom_data;
 }
 
-GeometryData* Scene::add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size) {
+GeometryData* Scene::add_plane(
+    const Pt3& p, const Vec3& n,
+    const Material* material,
+    const std::optional<MediumInterface>& medium_interface,
+    float half_size
+) {
     // plane will be modeled as a large quad centered around the given point
     
     OrthonormalBasis basis(n);
@@ -250,10 +268,14 @@ GeometryData* Scene::add_plane(const Pt3& p, const Vec3& n, const Material* mate
     Pt3 c = p + basis.u[0] * half_size + basis.u[1] * half_size;
     Pt3 d = p - basis.u[0] * half_size + basis.u[1] * half_size;
     
-    return add_quad(a, b, c, d, material); 
+    return add_quad(a, b, c, d, material, medium_interface); 
 }
 
-GeometryData* Scene::add_sphere(const Pt3& center, float radius, const Material* material) {
+GeometryData* Scene::add_sphere(
+    const Pt3& center, float radius,
+    const Material* material,
+    const std::optional<MediumInterface>& medium_interface    
+) {
     RTCGeometry geom = rtcNewGeometry(
         m_device,
         RTC_GEOMETRY_TYPE_SPHERE_POINT
@@ -276,7 +298,11 @@ GeometryData* Scene::add_sphere(const Pt3& center, float radius, const Material*
     else {
         std::cerr << "Something went wrong when making sphere" << std::endl;
     }
-    m_geom_data.push_back({ ShapeType::SPHERE, material });
+    m_geom_data.push_back({
+        .shape = ShapeType::SPHERE,
+        .material = material,
+        .medium_interface = medium_interface
+    });
     GeometryData* geom_data = &m_geom_data.back();
     rtcSetGeometryUserData(geom, geom_data);
 
@@ -287,7 +313,12 @@ GeometryData* Scene::add_sphere(const Pt3& center, float radius, const Material*
     return geom_data;
 }
 
-GeometryData* Scene::add_obj(const std::string& filename, const Material* material, const Transform& transform) {
+GeometryData* Scene::add_obj(
+    const std::string& filename,
+    const Material* material,
+    const std::optional<MediumInterface>& medium_interface,
+    const Transform& transform
+) {
     auto obj_data = obj::load_obj(filename);
     if (!obj_data) {
         std::cerr << "Failed to load " << filename << std::endl;
@@ -361,6 +392,7 @@ GeometryData* Scene::add_obj(const std::string& filename, const Material* materi
     m_geom_data.push_back({
         .shape = ShapeType::OBJ,
         .material = material,
+        .medium_interface = medium_interface,
         .normals = std::move(normal_data)
     });
     GeometryData* geom_data = &m_geom_data.back();
@@ -373,7 +405,12 @@ GeometryData* Scene::add_obj(const std::string& filename, const Material* materi
     return geom_data;
 }
 
-GeometryData* Scene::add_grid(const Image& image, const Material* material, const Transform& transform) {
+GeometryData* Scene::add_grid(
+    const Image& image,
+    const Material* material,
+    const std::optional<MediumInterface>& medium_interface,
+    const Transform& transform
+) {
     auto geom = rtcNewGeometry(m_device, RTC_GEOMETRY_TYPE_GRID);
     float* vertex_buf = static_cast<float*>(rtcSetNewGeometryBuffer(
         geom,
@@ -418,7 +455,8 @@ GeometryData* Scene::add_grid(const Image& image, const Material* material, cons
 
     m_geom_data.push_back({
         .shape = ShapeType::GRID,
-        .material = material
+        .material = material,
+        .medium_interface = medium_interface
     });
     GeometryData* geom_data = &m_geom_data.back();
     rtcSetGeometryUserData(geom, geom_data);
@@ -462,4 +500,8 @@ void Scene::add_light(std::unique_ptr<Light>&& light) {
 void Scene::set_bg_light(std::shared_ptr<const Spectrum> spectrum, float scale) {
     m_bg_light.spectrum = spectrum;
     m_bg_light.scale = scale;
+}
+
+bool Scene::has_media() const {
+    return std::any_of(m_geom_data.begin(), m_geom_data.end(), [](const GeometryData& geom) { return geom.medium_interface.has_value(); });
 }

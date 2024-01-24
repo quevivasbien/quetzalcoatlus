@@ -49,7 +49,7 @@ int main() {
         std::make_shared<RGBIlluminantSpectrum>(RGB(8., 2., 4.)),
         60.0f
     ));
-    scene.add_grid(image, &material, Transform::translation(0.5, 0., -5.) * Transform::rotate_x(-0.5));
+    scene.add_grid(image, &material, std::nullopt, Transform::translation(0.5, 0., -5.) * Transform::rotate_x(-0.5));
     scene.commit();
 
     Camera camera(800, 800, M_PI_4);

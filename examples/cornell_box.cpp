@@ -1,5 +1,4 @@
 #include <iostream>
-#include <chrono>
 
 #include "camera.hpp"
 #include "image.hpp"
@@ -22,7 +21,7 @@ int main() {
         std::make_unique<AreaLight>(
             std::move(light_shape),
             light_spectrum,
-            12.0f,
+            18.0f,
             false
         )
     );
@@ -89,16 +88,11 @@ int main() {
     std::cout << "Rendering " << camera.image_height * camera.image_width << " pixels with " <<
         n_samples << " samples and " << max_bounces << " bounces" << std::endl;
 
-    auto start_time = std::chrono::steady_clock::now();
     auto result = render(
         camera,
         scene,
         n_samples, max_bounces
     );
-    auto end_time = std::chrono::steady_clock::now();
-    std::cout << "Render time: " <<
-        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count() <<
-        "ms" << std::endl;
 
     result.save("cornell_box_no_denoise.png");
 

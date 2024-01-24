@@ -36,6 +36,7 @@ struct GeometryData {
     ShapeType shape;
     const Material* material;
     const AreaLight* light;
+    std::optional<MediumInterface> medium_interface;
     std::unique_ptr<NormalData> normals;
 };
 
@@ -55,7 +56,7 @@ public:
     std::optional<SurfaceInteraction> ray_intersect(const Ray& ray, const WavelengthSample& wavelengths, Sampler& sampler) const;
 
     // sample illumination from lights at a given point
-    std::pair<const Light*, float> sample_lights(const Pt3& point, const Vec3& normal, Sampler& sampler) const;
+    std::pair<const Light*, float> sample_lights(const Pt3& point, Sampler& sampler) const;
     // get proba of sampling a given light
     float light_sample_pmf(const Pt3& point, const Vec3& normal, const Light* light) const;
     // check if end is visible from start
@@ -64,16 +65,42 @@ public:
     // methods for adding shapes to scene; return geometry ID
     // in cases where multiple points are required, they should be given in clockwise order around the outward face
 
-    GeometryData* add_triangle(const Pt3& a, const Pt3& b, const Pt3& c, const Material* material);
-    GeometryData* add_sphere(const Pt3& center, float radius, const Material* material);
-    GeometryData* add_quad(const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d, const Material* material);
+    GeometryData* add_triangle(
+        const Pt3& a, const Pt3& b, const Pt3& c,
+        const Material* material,
+        const std::optional<MediumInterface>& medium_interface = std::nullopt
+    );
+    GeometryData* add_sphere(
+        const Pt3& center, float radius,
+        const Material* material,
+        const std::optional<MediumInterface>& = std::nullopt
+    );
+    GeometryData* add_quad(
+        const Pt3& a, const Pt3& b, const Pt3& c, const Pt3& d,
+        const Material* material,
+        const std::optional<MediumInterface>& = std::nullopt
+    );
     // plane is just a large square quad centered around the given point
-    GeometryData* add_plane(const Pt3& p, const Vec3& n, const Material* material, float half_size = 1000.0f);
-
+    GeometryData* add_plane(
+        const Pt3& p, const Vec3& n,
+        const Material* material,
+        const std::optional<MediumInterface>& = std::nullopt,
+        float half_size = 1000.0f
+    );
     // add objects from .obj (wavefront OBJ) file
-    GeometryData* add_obj(const std::string& filename, const Material* material, const Transform& transform = Transform::identity());
+    GeometryData* add_obj(
+        const std::string& filename,
+        const Material* material,
+        const std::optional<MediumInterface>& = std::nullopt,
+        const Transform& transform = Transform::identity()
+    );
 
-    GeometryData* add_grid(const Image& image, const Material* material, const Transform& transform = Transform::identity());
+    GeometryData* add_grid(
+        const Image& image,
+        const Material* material,
+        const std::optional<MediumInterface>& = std::nullopt,
+        const Transform& transform = Transform::identity()
+    );
 
     // add a light to the scene
     void add_light(std::unique_ptr<Light>&& light);
@@ -94,6 +121,8 @@ public:
     }
 
     const BackgroundLight& get_bg_light () const { return m_bg_light; }
+
+    bool has_media() const;
 
 private:
     RTCScene m_scene;

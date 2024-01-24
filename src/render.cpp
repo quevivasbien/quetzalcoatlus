@@ -17,31 +17,19 @@
 // the number of pixels given to a single thread at a time
 const size_t THREAD_JOB_SIZE = 4096;
 
-struct PixelSample {
-    SpectrumSample color;
-    Vec3 normal;
-    SpectrumSample albedo;
+PixelSample& PixelSample::operator+=(const PixelSample& other) {
+    color += other.color;
+    normal += other.normal;
+    albedo += other.albedo;
+    return *this;
+}
 
-    PixelSample() : color(0.0f), normal(0.0f, 0.0f, 0.0f), albedo(0.0f) {}
-    PixelSample(
-        const Vec3& normal,
-        const SpectrumSample& albedo
-    ) : color(0.0f), normal(normal), albedo(albedo) {}
-
-    PixelSample& operator+=(const PixelSample& other) {
-        color += other.color;
-        normal += other.normal;
-        albedo += other.albedo;
-        return *this;
-    }
-
-    PixelSample& operator/=(float c) {
-        color /= c;
-        normal /= c;
-        albedo /= c;
-        return *this;
-    }
-};
+PixelSample& PixelSample::operator/=(float c) {
+    color /= c;
+    normal /= c;
+    albedo /= c;
+    return *this;
+}
 
 float power_heuristic(int n_f, float f_pdf, int n_g, float g_pdf) {
     float f = n_f * f_pdf;
@@ -52,22 +40,170 @@ float power_heuristic(int n_f, float f_pdf, int n_g, float g_pdf) {
     return f * f / (f * f + g * g);
 }
 
-// sample lights at a surface interaction
-SpectrumSample sample_lights(
+Renderer::Renderer(
+    const Camera& camera,
     const Scene& scene,
+    size_t n_samples,
+    size_t max_bounces
+) :
+    camera(camera),
+    scene(scene),
+    n_samples(n_samples),
+    max_bounces(max_bounces),
+    result(camera.image_height, camera.image_width),
+    progress_bar { .total = camera.image_height * camera.image_width },
+    use_media(camera.medium || scene.has_media())
+{}
+
+RenderResult Renderer::render() {
+    if (!scene.ready()) {
+        std::cout << "Scene must be committed before rendering." << std::endl;
+        return result;
+    }
+
+    size_t image_size = result.width * result.height;
+    auto start_time = std::chrono::steady_clock::now();
+
+    Sampler sampler(n_samples, camera.image_width, camera.image_height, 0);
+
+    #ifdef MULTITHREADED
+    std::vector<std::thread> threads;
+    size_t n_threads = std::clamp<size_t>(
+        std::thread::hardware_concurrency(),
+        1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
+    );
+    std::cout << "Rendering with " << n_threads << " threads" << std::endl;
+
+    // make a copy of the sampler for each thread
+    std::vector<Sampler> samplers;
+    samplers.reserve(n_threads);
+    for (size_t t = 0; t < n_threads; t++) {
+        samplers.push_back(sampler);
+    }
+
+    for (size_t t = 0; t < n_threads; t++) {
+        size_t start_index = current_index;
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            current_index += THREAD_JOB_SIZE;
+            if (current_index > image_size) {
+                current_index = image_size;
+            }
+        }
+
+        threads.push_back(std::thread(
+            &Renderer::render_pixels,
+            this,
+            start_index,
+            current_index,
+            std::ref(samplers[t])
+        ));
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+    #else
+    // Single threaded render
+    std::cout << "Rendering in single threaded mode" << std::endl;
+    render_pixels(
+        0, image_size, std::ref(sampler)
+    );
+    #endif
+
+    auto end_time = std::chrono::steady_clock::now();
+    std::chrono::duration<float> duration = end_time - start_time;
+    std::cout << std::endl << "Render time: " << std::fixed << std::setprecision(3) << duration << std::endl;
+
+    return result;
+}
+
+void Renderer::render_pixels(
+    size_t start_index,
+    size_t end_index,
+    Sampler& sampler
+) {
+    for (size_t i = start_index; i < end_index; i++) {
+        size_t x = i % camera.image_width;
+        size_t y = camera.image_height - i / camera.image_width - 1;
+
+        RGB color{};
+        Vec3 normal{};
+        RGB albedo{};
+        for (size_t s = 0; s < n_samples; s++) {
+            sampler.start_pixel_sample(x, y, s);
+            auto jitter = sampler.sample_pixel();
+            float u = float(x) + jitter.x;
+            float v = float(y) + jitter.y;
+            Ray r = camera.cast_ray(u, v);
+            WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
+            PixelSample pxs;
+            if (use_media) {
+                pxs = sample_pixel_with_media(r, wavelengths, sampler);
+            }
+            else {
+                pxs = sample_pixel(r, wavelengths, sampler);
+            }
+            color += camera.sensor.to_sensor_rgb(pxs.color, wavelengths);
+            albedo += camera.sensor.to_sensor_rgb(pxs.albedo, wavelengths);
+            normal += pxs.normal;
+        }
+        
+        color /= float(n_samples);
+        albedo /= float(n_samples);
+        normal /= float(n_samples);
+
+        result.color_buffer[i * 3 + 0] = color.x;
+        result.color_buffer[i * 3 + 1] = color.y;
+        result.color_buffer[i * 3 + 2] = color.z;
+
+        result.normal_buffer[i * 3 + 0] = normal.x;
+        result.normal_buffer[i * 3 + 1] = normal.y;
+        result.normal_buffer[i * 3 + 2] = normal.z;
+
+        result.albedo_buffer[i * 3 + 0] = albedo.x;
+        result.albedo_buffer[i * 3 + 1] = albedo.y;
+        result.albedo_buffer[i * 3 + 2] = albedo.z;
+    }
+    progress_bar.increment(end_index - start_index);
+
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (current_index == camera.image_height * camera.image_width) {
+            return;
+        }
+        start_index = current_index;
+        current_index = std::min(current_index + THREAD_JOB_SIZE, camera.image_height * camera.image_width);
+        end_index = current_index;
+    }
+    render_pixels(
+        start_index,
+        end_index,
+        sampler
+    );
+}
+
+PixelSample Renderer::sample_pixel(
+    Ray r,
+    WavelengthSample& wavelengths,
+    Sampler& sampler
+) {
+    return sample_pixel_with_media(r, wavelengths, sampler);
+}
+
+// sample lights at a surface interaction
+SpectrumSample Renderer::sample_lights(
     const SurfaceInteraction& si,
     const BSDF& bsdf,
     const WavelengthSample& wavelengths,
     Sampler& sampler
 ) {
-    auto [light, sample_proba] = scene.sample_lights(si.point, si.normal, sampler);
+    auto [light, sample_proba] = scene.sample_lights(si.point, sampler);
     // need to do this regardless of early exit in order to keep sampler depth even
     Vec2 sample2 = sampler.sample_2d();
     if (!light) {
-        sampler.sample_2d();  
         return SpectrumSample(0.0f);
     }
-    auto ls = light->sample(si, wavelengths, sample2);
+    auto ls = light->sample(si.point, wavelengths, sample2);
     if (!ls || ls->spec.is_zero() || ls->pdf == 0.0f) {
         return SpectrumSample(0.0f);
     }
@@ -88,25 +224,12 @@ SpectrumSample sample_lights(
     }
 }
 
-// sample lights at a medium interaction
-SpectrumSample sample_lights(
-    const Scene& scene,
-    const MediumInteraction& mi,
-    const WavelengthSample& wavelengths,
-    Sampler& sampler
-) {
-    // TODO!
-    return SpectrumSample(0.0f);
-}
-
 // the heavy lifting goes on here
 // computes a single sample on a single pixel
-PixelSample sample_pixel(
+PixelSample Renderer::sample_pixel_with_media(
     Ray ray,
-    const Scene& scene,
     WavelengthSample& wavelengths,
-    Sampler& sampler,
-    size_t max_bounces
+    Sampler& sampler
 ) {
     PixelSample pxs{};
     SpectrumSample weight(1.0f);
@@ -165,7 +288,8 @@ PixelSample sample_pixel(
                                 .phase = ms.phase
                             };
                             // sample direct lighting
-                            pxs.color += sample_lights(scene, intr, wavelengths, sampler) * weight * r_u;
+                            // TODO
+                            // pxs.color += sample_lights(intr, wavelengths, sampler) * weight * r_u;
                             // sample new direction
                             auto ps_opt = intr.phase.sample(-ray.d, sampler.sample_2d());
                             if (!ps_opt || ps_opt->pdf == 0.0f) {
@@ -173,7 +297,7 @@ PixelSample sample_pixel(
                             }
                             else {
                                 auto ps = *ps_opt;
-                                // weight *= ps.pdf / ps.pdf;
+                                // weight *= ps.pdf / ps.pdf;  // not necessary since I've only implemented the HG phase func
                                 r_l = r_u / ps.pdf;
                                 last_p = p;
                                 // TODO: what to do with last_normal?
@@ -279,7 +403,7 @@ PixelSample sample_pixel(
         
         if (!bsdf->is_specular()) {
             // sample direct illumination from light sources
-            pxs.color += weight * sample_lights(scene, *si, *bsdf, wavelengths, sampler);
+            pxs.color += weight * sample_lights(*si, *bsdf, wavelengths, sampler);
         }
 
         last_p = si->point;
@@ -304,11 +428,11 @@ PixelSample sample_pixel(
             ior_scale *= bsdf_sample->ior;
         }
 
-        ray = Ray(si->point, bsdf_sample->wi);
+        ray = Ray(si->point, bsdf_sample->wi, si->get_medium(bsdf_sample->wi));
 
         // maybe terminate early (russian roulette)
         float roulette_sample = sampler.sample_1d();
-        auto rr_weight = weight * ior_scale;
+        auto rr_weight = weight * ior_scale / r_u.average();
         if (rr_weight.max_component() < 1.f && depth > 1) {
             float q = std::max(0.0f, 1.0f - rr_weight.max_component());
             if (roulette_sample < q) {
@@ -321,111 +445,30 @@ PixelSample sample_pixel(
     return pxs;
 }
 
-struct ProgressBar {
-    size_t total;
-    size_t current = 0;
-    size_t width = 40;
-    std::mutex mutex;
-    
-    void display() {
-        std::cout << "[";
-        size_t pos = width * current / total;
-        for (size_t i = 0; i < width; i++) {
-            if (i < pos) {
-                std::cout << "=";
-            }
-            else if (i == pos) {
-                std::cout << ">";
-            }
-            else {
-                std::cout << " ";
-            }
+void ProgressBar::display() {
+    std::cout << "[";
+    size_t pos = width * current / total;
+    for (size_t i = 0; i < width; i++) {
+        if (i < pos) {
+            std::cout << "=";
         }
-        std::cout << "] " << int(100.0 * current / total) << "%\r";
-        std::cout.flush();
-    }
-
-    void increment(int n = 1, bool display = true) {
-        std::lock_guard<std::mutex> lock(mutex);
-        current += n;
-        if (display) {
-            this->display();
+        else if (i == pos) {
+            std::cout << ">";
+        }
+        else {
+            std::cout << " ";
         }
     }
-};
+    std::cout << "] " << int(100.0 * current / total) << "%\r";
+    std::cout.flush();
+}
 
-void render_pixels(
-    const Camera& camera,
-    const Scene& scene,
-    Sampler& sampler,
-    size_t max_bounces,
-    RenderResult& result,
-    size_t start_index,
-    size_t end_index,
-    size_t& global_index,
-    std::mutex& mutex,
-    ProgressBar& progress_bar
-) {
-    int n_samples = sampler.samples_per_pixel();
-    for (size_t i = start_index; i < end_index; i++) {
-        size_t x = i % camera.image_width;
-        size_t y = camera.image_height - i / camera.image_width - 1;
-
-        RGB color{};
-        Vec3 normal{};
-        RGB albedo{};
-        for (size_t s = 0; s < n_samples; s++) {
-            sampler.start_pixel_sample(x, y, s);
-            auto jitter = sampler.sample_pixel();
-            float u = float(x) + jitter.x;
-            float v = float(y) + jitter.y;
-            Ray r = camera.cast_ray(u, v);
-            WavelengthSample wavelengths = WavelengthSample::uniform(sampler.sample_1d());
-            auto pxs = sample_pixel(r, scene, wavelengths, sampler, max_bounces);
-            color += camera.sensor.to_sensor_rgb(pxs.color, wavelengths);
-            albedo += camera.sensor.to_sensor_rgb(pxs.albedo, wavelengths);
-            normal += pxs.normal;
-        }
-        
-        color /= float(n_samples);
-        albedo /= float(n_samples);
-        normal /= float(n_samples);
-
-        result.color_buffer[i * 3 + 0] = color.x;
-        result.color_buffer[i * 3 + 1] = color.y;
-        result.color_buffer[i * 3 + 2] = color.z;
-
-        result.normal_buffer[i * 3 + 0] = normal.x;
-        result.normal_buffer[i * 3 + 1] = normal.y;
-        result.normal_buffer[i * 3 + 2] = normal.z;
-
-        result.albedo_buffer[i * 3 + 0] = albedo.x;
-        result.albedo_buffer[i * 3 + 1] = albedo.y;
-        result.albedo_buffer[i * 3 + 2] = albedo.z;
+void ProgressBar::increment(int n, bool display) {
+    std::lock_guard<std::mutex> lock(mutex);
+    current += n;
+    if (display) {
+        this->display();
     }
-    progress_bar.increment(end_index - start_index);
-
-    {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (global_index == camera.image_height * camera.image_width) {
-            return;
-        }
-        start_index = global_index;
-        global_index = std::min(global_index + THREAD_JOB_SIZE, camera.image_height * camera.image_width);
-        end_index = global_index;
-    }
-    render_pixels(
-        camera,
-        scene,
-        sampler,
-        max_bounces,
-        result,
-        start_index,
-        end_index,
-        global_index,
-        mutex,
-        progress_bar
-    );
 }
 
 RenderResult render(
@@ -434,74 +477,5 @@ RenderResult render(
     size_t n_samples,
     size_t max_bounces
 ) {
-    RenderResult result(camera.image_height, camera.image_width);
-    if (!scene.ready()) {
-        std::cout << "Scene must be committed before rendering." << std::endl;
-        return result;
-    }
-    
-    size_t image_size = result.width * result.height;
-    Sampler sampler(n_samples, camera.image_width, camera.image_height, 0);
-
-    ProgressBar progress_bar { .total = image_size };
-    auto start_time = std::chrono::steady_clock::now();
-
-    #ifdef MULTITHREADED
-    std::vector<std::thread> threads;
-    size_t n_threads = std::clamp<size_t>(
-        std::thread::hardware_concurrency(),
-        1, (image_size + THREAD_JOB_SIZE - 1) / THREAD_JOB_SIZE
-    );
-    std::cout << "Rendering with " << n_threads << " threads" << std::endl;
-
-    // make a copy of the sampler for each thread
-    std::vector<Sampler> samplers;
-    samplers.reserve(n_threads);
-    for (size_t t = 0; t < n_threads; t++) {
-        samplers.push_back(sampler);
-    }
-
-    size_t end_index = 0;
-    std::mutex mutex;
-    for (size_t t = 0; t < n_threads; t++) {
-        size_t start_index = end_index;
-        {
-            std::lock_guard<std::mutex> lock(mutex);
-            end_index += THREAD_JOB_SIZE;
-            if (end_index > image_size) {
-                end_index = image_size;
-            }
-        }
-
-        threads.push_back(std::thread(
-            render_pixels,
-            std::ref(camera),
-            std::ref(scene),
-            std::ref(samplers[t]),
-            max_bounces,
-            std::ref(result),
-            start_index,
-            end_index,
-            std::ref(end_index),
-            std::ref(mutex),
-            std::ref(progress_bar)
-        ));
-    }
-    for (auto& t : threads) {
-        t.join();
-    }
-    #else
-    // Single threaded render
-    std::mutex _mutex;
-    render_pixels(
-        camera, scene, sampler, max_bounces,
-        result, 0, image_size, image_size, _mutex, progress_bar
-    );
-    #endif
-
-    auto end_time = std::chrono::steady_clock::now();
-    std::chrono::duration<float> duration = end_time - start_time;
-    std::cout << std::endl << "Render time: " << std::fixed << std::setprecision(3) <<duration << std::endl;
-
-    return result;
+    return Renderer(camera, scene, n_samples, max_bounces).render();
 }

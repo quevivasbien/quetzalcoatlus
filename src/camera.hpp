@@ -15,7 +15,8 @@ public:
         size_t image_height,
         float fov,
         const Transform& transform = Transform::identity(),
-        PixelSensor&& sensor = PixelSensor::CANON_EOS()
+        PixelSensor&& sensor = PixelSensor::CANON_EOS(),
+        const Medium *medium = nullptr
     );
 
     // creates a ray pointing to the pixel coordinates (u, v)
@@ -32,4 +33,6 @@ public:
     Vec3 pixel_delta_v;
 
     PixelSensor sensor;
+
+    const Medium *medium;
 };

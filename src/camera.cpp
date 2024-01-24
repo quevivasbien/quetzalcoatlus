@@ -5,8 +5,9 @@ Camera::Camera(
     size_t image_height,
     float fov,
     const Transform& transform,
-    PixelSensor&& sensor
-) : image_width(image_width), image_height(image_height), sensor(sensor) {
+    PixelSensor&& sensor,
+    const Medium* medium
+) : image_width(image_width), image_height(image_height), sensor(sensor), medium(medium) {
     float viewport_height = 2.0f * tanf(fov * 0.5f);
     float viewport_width = viewport_height * float(image_width) / float(image_height);
 
@@ -27,6 +28,7 @@ Camera::Camera(
 Ray Camera::cast_ray(float u, float v) const {
     return Ray(
         pos,
-        viewport_bottom_left + pixel_delta_u * u + pixel_delta_v * v - pos
+        viewport_bottom_left + pixel_delta_u * u + pixel_delta_v * v - pos,
+        medium
     );
 }
