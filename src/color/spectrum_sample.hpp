@@ -61,7 +61,7 @@ public:
     SpectrumSample& operator+=(const SpectrumSample& other);
     SpectrumSample operator-(const SpectrumSample& other) const;
     SpectrumSample& operator-=(const SpectrumSample& other);
-    SpectrumSample operator*(const SpectrumSample& other);
+    SpectrumSample operator*(const SpectrumSample& other) const;
     SpectrumSample& operator*=(const SpectrumSample& other);
     SpectrumSample operator/(const SpectrumSample& other) const;
     SpectrumSample& operator/=(const SpectrumSample& other);

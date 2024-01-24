@@ -1,11 +1,23 @@
 #include <cmath>
-#include <cstring>
 
 #include "sampler.hpp"
 #include "util.hpp"
 
 // implementation here very closely based on implementation in PBRTv4
 // github.com/mmp/pbrt-v4
+
+float Sampler::sample_exponential(float u, float a) {
+    return -std::log(1.0f - u) / a;
+}
+
+int Sampler::sample_discrete(float u, const std::vector<float>& cdf) {
+    for (size_t i = 0; i < cdf.size(); i++) {
+        if (u < cdf[i]) {
+            return i;
+        }
+    }
+    return cdf.size() - 1;
+}
 
 Vec2 Sampler::sample_uniform_disk(Vec2 uv) {
     Vec2 offset = 2.0f * uv - Vec2(1.0f, 1.0f);
@@ -89,9 +101,11 @@ uint32_t round_up_pow2(uint32_t x) {
     return x + 1;
 }
 
-
-uint64_t MurmurHash64A(const unsigned char *key, size_t len,
-                                           uint64_t seed) {
+uint64_t murmur_hash_64a(
+    const unsigned char *key,
+    size_t len,
+    uint64_t seed
+) {
     const uint64_t m = 0xc6a4a7935bd1e995ull;
     const int r = 47;
 
@@ -149,13 +163,14 @@ void hash_recursive_copy(char *buf, T v, Args... args) {
     hash_recursive_copy(buf + sizeof(T), args...);
 }
 
+// hash an arbitrary number of arguments
 template <typename... Args>
-uint64_t hash(Args... args) {
+uint64_t hash_together(Args... args) {
     constexpr size_t sz = (sizeof(Args) + ... + 0);
     constexpr size_t n = (sz + 7) / 8;
     uint64_t buf[n];
     hash_recursive_copy(reinterpret_cast<char *>(buf), args...);
-    return MurmurHash64A(reinterpret_cast<const unsigned char *>(buf), sz, 0);
+    return murmur_hash_64a(reinterpret_cast<const unsigned char *>(buf), sz, 0);
 }
 
 int permutation_element(uint32_t i, uint32_t l, uint32_t p) {
@@ -209,7 +224,7 @@ DigitPermutation::DigitPermutation(int base, uint32_t seed) : base(base) {
     permutations = std::vector<uint16_t>(n_digits * base);
     // Compute random permutations for all digits
     for (int digitIndex = 0; digitIndex < n_digits; ++digitIndex) {
-        uint64_t dseed = hash(base, digitIndex, seed);
+        uint64_t dseed = hash_together(base, digitIndex, seed);
         for (int digitValue = 0; digitValue < base; ++digitValue) {
             int index = digitIndex * base + digitValue;
             permutations[index] = permutation_element(digitValue, base, dseed);

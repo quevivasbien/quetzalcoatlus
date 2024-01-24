@@ -103,7 +103,7 @@ SpectrumSample& SpectrumSample::operator-=(const SpectrumSample& other) {
     }
     return *this;
 }
-SpectrumSample SpectrumSample::operator*(const SpectrumSample& other) {
+SpectrumSample SpectrumSample::operator*(const SpectrumSample& other) const {
     SampleArray values;
     for (size_t i = 0; i < N_SPECTRUM_SAMPLES; ++i) {
         values[i] = m_values[i] * other.m_values[i];

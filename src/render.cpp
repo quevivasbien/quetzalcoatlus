@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iostream>
 #include <mutex>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -51,6 +52,7 @@ float power_heuristic(int n_f, float f_pdf, int n_g, float g_pdf) {
     return f * f / (f * f + g * g);
 }
 
+// sample lights at a surface interaction
 SpectrumSample sample_lights(
     const Scene& scene,
     const SurfaceInteraction& si,
@@ -86,6 +88,17 @@ SpectrumSample sample_lights(
     }
 }
 
+// sample lights at a medium interaction
+SpectrumSample sample_lights(
+    const Scene& scene,
+    const MediumInteraction& mi,
+    const WavelengthSample& wavelengths,
+    Sampler& sampler
+) {
+    // TODO!
+    return SpectrumSample(0.0f);
+}
+
 // the heavy lifting goes on here
 // computes a single sample on a single pixel
 PixelSample sample_pixel(
@@ -100,14 +113,108 @@ PixelSample sample_pixel(
     size_t depth = 0;
     bool specular_bounce = false;
     bool any_nonspecular_bounce = false;
-    float p_b = 1.0f;
+    // rescaled unidirectional path probability
+    SpectrumSample r_u(1.0f);
+    // rescaled light path probability
+    SpectrumSample r_l(1.0f);
     float ior_scale = 1.0f;
     Pt3 last_p;
     Vec3 last_normal;
     while (!weight.is_zero()) {
         auto si = scene.ray_intersect(ray, wavelengths, sampler);
-        // no intersection, add background and break
+        if (ray.medium) {
+            // handle scattered rays
+            bool scattered = false;
+            bool terminated = false;
+            float t_max = si ? si->t : std::numeric_limits<float>::infinity();
+            // initialize rng for transmittance
+            std::mt19937 rng(hash(sampler.sample_1d()));
+            std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+            auto maj = sample_majorant(
+                ray,
+                t_max,
+                sampler.sample_1d(),
+                rng,
+                wavelengths,
+                [&](Pt3 p, const MediumSample& ms, const SpectrumSample& maj_val, const SpectrumSample& maj) {
+                    // handle scattering event
+                    float p_absorption = ms.absorption[0] / maj_val[0];
+                    float p_scattering = ms.scattering[0] / maj_val[0];
+                    float p_null = std::max(0.0f, 1.0f - p_absorption - p_scattering);
+                    float u = dist(rng);
+                    int mode = Sampler::sample_discrete(u, {p_absorption, p_scattering, p_null});
+                    if (mode == 0) {
+                        // handle absorption
+                        terminated = true;
+                        return false;
+                    }
+                    else if (mode == 1) {
+                        // handle scattering
+                        if (depth >= max_bounces) {
+                            terminated = true;
+                            return false;
+                        }
+                        float pdf = maj[0] * ms.scattering[0];
+                        weight *= maj * ms.scattering / pdf;
+                        r_u *= maj * ms.scattering / pdf;
+                        if (!weight.is_zero() && !r_u.is_zero()) {
+                            MediumInteraction intr {
+                                .point = p,
+                                .wo = -ray.d,
+                                .medium = ray.medium,
+                                .phase = ms.phase
+                            };
+                            // sample direct lighting
+                            pxs.color += sample_lights(scene, intr, wavelengths, sampler) * weight * r_u;
+                            // sample new direction
+                            auto ps_opt = intr.phase.sample(-ray.d, sampler.sample_2d());
+                            if (!ps_opt || ps_opt->pdf == 0.0f) {
+                                terminated = true;
+                            }
+                            else {
+                                auto ps = *ps_opt;
+                                // weight *= ps.pdf / ps.pdf;
+                                r_l = r_u / ps.pdf;
+                                last_p = p;
+                                // TODO: what to do with last_normal?
+                                scattered = true;
+                                ray.o = p;
+                                ray.d = ps.wi;
+                                specular_bounce = false;
+                                any_nonspecular_bounce = true;
+                            }
+                        }
+                        depth++;
+                        return false;
+                    }
+                    else {
+                        // handle null event
+                        auto null_value = (maj_val - ms.absorption - ms.scattering).map([](float v) { return std::max(0.0f, v); });
+                        float pdf = maj[0] * null_value[0];
+                        weight *= maj * null_value / pdf;
+                        if (pdf == 0.0f) {
+                            weight = SpectrumSample(0.0f);
+                        }
+                        r_u *= maj * null_value / pdf;
+                        r_l *= maj * maj_val / pdf;
+                        return !(weight.is_zero() || r_u.is_zero());
+                    }
+                }
+            );
+            if (terminated || weight.is_zero() || r_u.is_zero()) {
+                return pxs;
+            }
+            if (scattered) {
+                continue;
+            }
+
+            weight *= maj / maj[0];
+            r_u *= maj / maj[0];
+            r_l *= maj / maj[0];
+        }
+        // handle unscattered rays
         if (!si) {
+            // no intersection, add background and break
             auto bg_light = scene.get_bg_light();
             if (bg_light.spectrum) {
                 pxs.color += weight * SpectrumSample::from_spectrum(*bg_light.spectrum, wavelengths) * bg_light.scale;
@@ -121,21 +228,16 @@ PixelSample sample_pixel(
         auto emitted = si->emission(-ray.d, wavelengths);
         if (!emitted.is_zero()) {
             if (depth == 0 || specular_bounce) {
-                pxs.color += weight * emitted;
+                pxs.color += weight * emitted / r_u.average();
             }
             else {
                 // compute importance-sampled weight for area light
                 auto light = si->light;
-                assert(light);
                 float light_proba = scene.light_sample_pmf(last_p, last_normal, light)
                     * light->pdf(last_p, ray.d);
-                float light_weight = power_heuristic(1, p_b, 1, light_proba);
-
-                pxs.color += emitted * (weight * light_weight);
+                r_l *= light_proba;
+                pxs.color += emitted * (weight / (r_u + r_l).average());
             }
-        }
-        if (depth == max_bounces) {
-            break;
         }
 
         auto bsdf = si->bsdf(ray, wavelengths, sampler.sample_1d());
@@ -168,33 +270,41 @@ PixelSample sample_pixel(
 
             pxs.albedo = bsdf->rho_hd(si->wo, uc, u2);
         }
+
+
+        if (depth >= max_bounces) {
+            break;
+        }
+        depth++;
         
         if (!bsdf->is_specular()) {
             // sample direct illumination from light sources
             pxs.color += weight * sample_lights(scene, *si, *bsdf, wavelengths, sampler);
         }
 
+        last_p = si->point;
+        last_normal = si->normal;
+
         auto bsdf_sample = bsdf->sample(si->wo, sampler.sample_1d(), sampler.sample_2d());
         if (!bsdf_sample) {
             break;
         }
-        // if (depth == 0) {
-        //     pxs.albedo = bsdf_sample->spec;
-        // }
 
         weight *= bsdf_sample->spec * std::abs(bsdf_sample->wi.dot(si->normal)) / bsdf_sample->pdf;
 
-        p_b = bsdf_sample->pdf_is_proportional ? bsdf->pdf(si->wo, bsdf_sample->wi) : bsdf_sample->pdf;
+        if (bsdf_sample->pdf_is_proportional) {
+            r_l = r_u / bsdf->pdf(si->wo, bsdf_sample->wi);
+        }
+        else {
+            r_l = r_u / bsdf_sample->pdf;
+        }
         specular_bounce = bsdf_sample->scatter_type.specular;
         any_nonspecular_bounce |= !specular_bounce;
         if (bsdf_sample->scatter_type.transmission) {
             ior_scale *= bsdf_sample->ior;
         }
-        last_p = si->point;
-        last_normal = si->normal;
 
         ray = Ray(si->point, bsdf_sample->wi);
-        depth++;
 
         // maybe terminate early (russian roulette)
         float roulette_sample = sampler.sample_1d();

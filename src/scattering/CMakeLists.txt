@@ -1,5 +1,4 @@
-add_library(scattering STATIC
+target_sources(lib PRIVATE
     phase_function.cpp
+    medium.cpp
 )
-
-target_link_libraries(scattering PRIVATE lib)

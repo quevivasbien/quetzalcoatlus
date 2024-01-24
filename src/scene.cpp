@@ -107,6 +107,7 @@ std::optional<SurfaceInteraction> Scene::ray_intersect(
     }
 
     return SurfaceInteraction(
+        rayhit.ray.tfar,
         ray.at(rayhit.ray.tfar),
         (-ray.d).normalized(),
         normal,

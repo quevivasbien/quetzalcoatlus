@@ -11,6 +11,7 @@
 struct SurfaceInteraction {
 
     SurfaceInteraction(
+        float t,
         const Pt3& point,
         const Vec3& wo,
         const Vec3& normal,
@@ -18,7 +19,7 @@ struct SurfaceInteraction {
         const Material* material = nullptr,
         const AreaLight* light = nullptr,
         const std::optional<MediumInterface>& medium_interface = std::nullopt
-    ) : point(point), wo(wo), normal(normal), uv(uv), material(material), light(light), medium_interface(medium_interface) {}
+    ) : t(t), point(point), wo(wo), normal(normal), uv(uv), material(material), light(light), medium_interface(medium_interface) {}
 
     std::optional<BSDF> bsdf(const Ray& ray, WavelengthSample& wavelengths, float sample) const {
         if (!material) {
@@ -53,6 +54,7 @@ struct SurfaceInteraction {
         return nullptr;
     }
 
+    float t;
     Pt3 point;
     Vec3 wo;
     Vec3 normal;
@@ -60,4 +62,11 @@ struct SurfaceInteraction {
     const Material* material = nullptr;
     const Light* light = nullptr;
     std::optional<MediumInterface> medium_interface = std::nullopt;
+};
+
+struct MediumInteraction {
+    Pt3 point;
+    Vec3 wo;
+    const Medium* medium;
+    PhaseFunction phase;
 };

@@ -1,8 +1,16 @@
 #pragma once
 
+#include <cstring>
 #include <random>
 
 #include "vec.hpp"
+
+uint64_t murmur_hash_64a(const unsigned char *key, size_t len, uint64_t seed);
+
+template <typename T>
+uint64_t hash(const T& t) {
+    return murmur_hash_64a(reinterpret_cast<const unsigned char*>(&t), sizeof(T), 0);
+}
 
 // used by the Halton sampler
 class DigitPermutation {
@@ -35,6 +43,9 @@ public:
     int samples_per_pixel() const {
         return m_samples_per_pixel;
     }
+
+    static float sample_exponential(float u, float a);
+    static int sample_discrete(float u, const std::vector<float>& cdf);
 
     static Vec2 sample_uniform_disk(Vec2 uv);
     Vec2 sample_uniform_disk();
