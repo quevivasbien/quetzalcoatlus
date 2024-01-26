@@ -7,17 +7,18 @@
 
 struct SurfaceInteraction;
 
+enum LightType {
+    POINT,
+    DIRECTIONAL,
+    AREA
+};
+
 struct LightSample {
     SpectrumSample spec;
     Vec3 wi;
     float pdf;
     Pt3 p_light;
-};
-
-enum LightType {
-    POINT,
-    DIRECTIONAL,
-    AREA
+    LightType light_type;
 };
 
 class Light {

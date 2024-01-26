@@ -55,7 +55,7 @@ Renderer::Renderer(
     use_media(camera.medium || scene.has_media())
 {}
 
-RenderResult Renderer::render() {
+RenderResult& Renderer::render() {
     if (!scene.ready()) {
         std::cout << "Scene must be committed before rendering." << std::endl;
         return result;
@@ -182,46 +182,160 @@ void Renderer::render_pixels(
     );
 }
 
+void add_bg_light(
+    SpectrumSample& color,
+    const Scene& scene,
+    const SpectrumSample& weight,
+    const WavelengthSample& wavelengths
+) {
+    auto bg_light = scene.get_bg_light();
+    if (bg_light.spectrum) {
+        color += weight * SpectrumSample::from_spectrum(*bg_light.spectrum, wavelengths) * bg_light.scale;
+    }
+}
+
+SpectrumSample sample_albedo(const SurfaceInteraction& si, const BSDF& bsdf) {
+    const size_t N_ALBEDO_SAMPLES = 16;
+    const std::array<float, N_ALBEDO_SAMPLES> uc = {
+        0.75741637, 0.37870818, 0.7083487, 0.18935409, 0.9149363, 0.35417435,
+        0.5990858,  0.09467703, 0.8578725, 0.45746812, 0.686759,  0.17708716,
+        0.9674518,  0.2995429,  0.5083201, 0.047338516
+    };
+    const std::array<Vec2, N_ALBEDO_SAMPLES> u2 = {
+        Vec2(0.855985, 0.570367), Vec2(0.381823, 0.851844),
+        Vec2(0.285328, 0.764262), Vec2(0.733380, 0.114073),
+        Vec2(0.542663, 0.344465), Vec2(0.127274, 0.414848),
+        Vec2(0.964700, 0.947162), Vec2(0.594089, 0.643463),
+        Vec2(0.095109, 0.170369), Vec2(0.825444, 0.263359),
+        Vec2(0.429467, 0.454469), Vec2(0.244460, 0.816459),
+        Vec2(0.756135, 0.731258), Vec2(0.516165, 0.152852),
+        Vec2(0.180888, 0.214174), Vec2(0.898579, 0.503897)
+    };
+
+    return bsdf.rho_hd(si.wo, uc, u2);
+}
+
+// decide whether to terminate early, and update the sampling weight appropriately
+bool russian_roulette(
+    SpectrumSample& weight,
+    float ior_scale,
+    size_t depth,
+    float roulette_sample,
+    float scale_correction = 1.0f
+) {
+    auto rr_weight = weight * ior_scale / scale_correction;
+    if (rr_weight.max_component() < 1.f && depth > 0) {
+        float q = std::max(0.0f, 1.0f - rr_weight.max_component());
+        if (roulette_sample < q) {
+            return true;
+        }
+        weight /= 1.0f - q;
+    }
+    return false;
+}
+
 PixelSample Renderer::sample_pixel(
-    Ray r,
+    Ray ray,
     WavelengthSample& wavelengths,
     Sampler& sampler
 ) {
-    return sample_pixel_with_media(r, wavelengths, sampler);
-}
+    PixelSample pxs{};
+    SpectrumSample weight(1.0f);
+    size_t depth = 0;
+    bool specular_bounce = false;
+    bool any_nonspecular_bounce = false;
+    float p_b = 1.0f;
+    float ior_scale = 1.0f;
+    Pt3 last_p;
+    Vec3 last_normal;
 
-// sample lights at a surface interaction
-SpectrumSample Renderer::sample_lights(
-    const SurfaceInteraction& si,
-    const BSDF& bsdf,
-    const WavelengthSample& wavelengths,
-    Sampler& sampler
-) {
-    auto [light, sample_proba] = scene.sample_lights(si.point, sampler);
-    // need to do this regardless of early exit in order to keep sampler depth even
-    Vec2 sample2 = sampler.sample_2d();
-    if (!light) {
-        return SpectrumSample(0.0f);
+    while (!weight.is_zero()) {
+        auto si_opt = scene.ray_intersect(ray, wavelengths, sampler);
+        if (!si_opt) {
+            add_bg_light(pxs.color, scene, weight, wavelengths);
+            break;
+        }
+        
+        auto& si = *si_opt;
+
+        if (depth == 0) {
+            // collect normal for first surface interaction
+            pxs.normal = si.normal;
+        }
+
+        // add emitted light if intersected object is an area light
+        auto emitted = si.emission(-ray.d, wavelengths);
+        if (!emitted.is_zero()) {
+            if (depth == 0 || specular_bounce) {
+                pxs.color += weight * emitted;
+            }
+            else {
+                // compute importance-sampled weight for area light
+                auto light = si.light;
+                float light_proba = scene.light_sample_pmf(last_p, last_normal, light)
+                    * light->pdf(last_p, ray.d);
+                float light_weight = power_heuristic(1, p_b, 1, light_proba);
+
+                pxs.color += emitted * (weight * light_weight);
+            }
+        }
+        
+        // check if we've reached max bounces
+        if (depth == max_bounces) {
+            break;
+        }
+
+        auto bsdf_opt = si.bsdf(ray, wavelengths, sampler.sample_1d());
+        if (!bsdf_opt) {
+            // we hit a surface, but that surface has no material properties
+            specular_bounce = true;
+            ray = si.skip_intersection(ray);
+            continue;
+        }
+        auto& bsdf = *bsdf_opt;
+
+        if (depth == 0) {
+            // collect albedo for first surface interaction (with a sampleable albedo)
+            pxs.albedo = sample_albedo(si, bsdf);
+        }
+
+        if (!bsdf.is_specular()) {
+            // sample direct illumination from light sources
+            pxs.color += weight * sample_direct_lighting(si, bsdf, wavelengths, sampler);
+        }
+
+        auto bsdf_sample_opt = bsdf.sample(
+            si.wo,
+            sampler.sample_1d(),
+            sampler.sample_2d()
+        );
+        if (!bsdf_sample_opt) {
+            break;
+        }
+        auto& bsdf_sample = *bsdf_sample_opt;
+
+        weight *= bsdf_sample.spec * std::abs(bsdf_sample.wi.dot(si.normal)) / bsdf_sample.pdf;
+
+        p_b = bsdf_sample.pdf_is_proportional ? bsdf.pdf(si.wo, bsdf_sample.wi) : bsdf_sample.pdf;
+        specular_bounce = bsdf_sample.scatter_type.specular;
+        any_nonspecular_bounce |= !specular_bounce;
+        if (bsdf_sample.scatter_type.transmission) {
+            ior_scale *= bsdf_sample.ior;
+        }
+        last_p = si.point;
+        last_normal = si.normal;
+
+        // spawn new ray
+        ray = Ray(si.point, bsdf_sample.wi);
+
+        if (russian_roulette(weight, ior_scale, depth, sampler.sample_1d())) {
+            break;
+        }
+
+        depth++;
     }
-    auto ls = light->sample(si.point, wavelengths, sample2);
-    if (!ls || ls->spec.is_zero() || ls->pdf == 0.0f) {
-        return SpectrumSample(0.0f);
-    }
-    Vec3 wo = si.wo;
-    Vec3 wi = ls->wi;
-    auto f = bsdf(wo, wi) * std::abs(wi.dot(si.normal));
-    if (f.is_zero() || scene.occluded(si.point, ls->p_light)) {
-        return SpectrumSample(0.0f);
-    }
-    float p_l = sample_proba * ls->pdf;
-    if (light->type() == LightType::AREA) {
-        float p_b = bsdf.pdf(wo, wi);
-        float w_l = power_heuristic(1, p_l, 1, p_b);
-        return ls->spec * f * (w_l / p_l);
-    }
-    else {
-        return ls->spec * f / p_l;
-    }
+
+    return pxs;
 }
 
 // the heavy lifting goes on here
@@ -243,6 +357,7 @@ PixelSample Renderer::sample_pixel_with_media(
     float ior_scale = 1.0f;
     Pt3 last_p;
     Vec3 last_normal;
+
     while (!weight.is_zero()) {
         auto si = scene.ray_intersect(ray, wavelengths, sampler);
         if (ray.medium) {
@@ -288,8 +403,11 @@ PixelSample Renderer::sample_pixel_with_media(
                                 .phase = ms.phase
                             };
                             // sample direct lighting
-                            // TODO
-                            // pxs.color += sample_lights(intr, wavelengths, sampler) * weight * r_u;
+                            pxs.color += sample_direct_lighting_with_media(
+                                intr,
+                                wavelengths,
+                                sampler
+                            ) * weight * r_u;
                             // sample new direction
                             auto ps_opt = intr.phase.sample(-ray.d, sampler.sample_2d());
                             if (!ps_opt || ps_opt->pdf == 0.0f) {
@@ -336,13 +454,11 @@ PixelSample Renderer::sample_pixel_with_media(
             r_u *= maj / maj[0];
             r_l *= maj / maj[0];
         }
+
         // handle unscattered rays
         if (!si) {
             // no intersection, add background and break
-            auto bg_light = scene.get_bg_light();
-            if (bg_light.spectrum) {
-                pxs.color += weight * SpectrumSample::from_spectrum(*bg_light.spectrum, wavelengths) * bg_light.scale;
-            }
+            add_bg_light(pxs.color, scene, weight, wavelengths);
             break;
         }
         if (depth == 0) {
@@ -374,36 +490,16 @@ PixelSample Renderer::sample_pixel_with_media(
         }
 
         if (depth == 0) {
-            // sample albedo
-            const size_t N_ALBEDO_SAMPLES = 16;
-            const std::array<float, N_ALBEDO_SAMPLES> uc = {
-                0.75741637, 0.37870818, 0.7083487, 0.18935409, 0.9149363, 0.35417435,
-                0.5990858,  0.09467703, 0.8578725, 0.45746812, 0.686759,  0.17708716,
-                0.9674518,  0.2995429,  0.5083201, 0.047338516
-            };
-            const std::array<Vec2, N_ALBEDO_SAMPLES> u2 = {
-                Vec2(0.855985, 0.570367), Vec2(0.381823, 0.851844),
-                Vec2(0.285328, 0.764262), Vec2(0.733380, 0.114073),
-                Vec2(0.542663, 0.344465), Vec2(0.127274, 0.414848),
-                Vec2(0.964700, 0.947162), Vec2(0.594089, 0.643463),
-                Vec2(0.095109, 0.170369), Vec2(0.825444, 0.263359),
-                Vec2(0.429467, 0.454469), Vec2(0.244460, 0.816459),
-                Vec2(0.756135, 0.731258), Vec2(0.516165, 0.152852),
-                Vec2(0.180888, 0.214174), Vec2(0.898579, 0.503897)
-            };
-
-            pxs.albedo = bsdf->rho_hd(si->wo, uc, u2);
+            pxs.albedo = sample_albedo(*si, *bsdf);
         }
-
 
         if (depth >= max_bounces) {
             break;
         }
-        depth++;
         
         if (!bsdf->is_specular()) {
             // sample direct illumination from light sources
-            pxs.color += weight * sample_lights(*si, *bsdf, wavelengths, sampler);
+            pxs.color += weight * sample_direct_lighting_with_media(*si, *bsdf, wavelengths, sampler);
         }
 
         last_p = si->point;
@@ -431,18 +527,60 @@ PixelSample Renderer::sample_pixel_with_media(
         ray = Ray(si->point, bsdf_sample->wi, si->get_medium(bsdf_sample->wi));
 
         // maybe terminate early (russian roulette)
-        float roulette_sample = sampler.sample_1d();
-        auto rr_weight = weight * ior_scale / r_u.average();
-        if (rr_weight.max_component() < 1.f && depth > 1) {
-            float q = std::max(0.0f, 1.0f - rr_weight.max_component());
-            if (roulette_sample < q) {
-                break;
-            }
-            weight /= 1.0f - q;
+        if (russian_roulette(weight, ior_scale, depth, sampler.sample_1d(), r_u.average())) {
+            break;
         }
+        depth++;
     }
 
     return pxs;
+}
+
+std::optional<std::pair<LightSample, float>> Renderer::sample_lights(
+    Pt3 point,
+    const WavelengthSample& wavelengths,
+    Sampler& sampler
+) {
+    auto [light, sample_proba] = scene.sample_lights(point, sampler);
+    Vec2 sample2 = sampler.sample_2d();
+    if (!light) {
+        return std::nullopt;
+    }
+    auto ls = light->sample(point, wavelengths, sample2);
+    if (!ls || ls->spec.is_zero() || ls->pdf == 0.0f) {
+        return std::nullopt;
+    }
+    float p_l = sample_proba * ls->pdf;
+
+    return std::make_pair(*ls, p_l);
+}
+
+SpectrumSample Renderer::sample_direct_lighting(
+    const SurfaceInteraction& si,
+    const BSDF& bsdf,
+    const WavelengthSample& wavelengths,
+    Sampler& sampler
+) {
+    auto sample_opt = sample_lights(si.point, wavelengths, sampler);
+    if (!sample_opt) {
+        return SpectrumSample(0.0f);
+    }
+    auto [ls, p_l] = *sample_opt;
+    
+    Vec3 wo = si.wo;
+    Vec3 wi = ls.wi;
+    auto f = bsdf(wo, wi) * std::abs(wi.dot(si.normal));
+    if (f.is_zero() || scene.occluded(si.point, ls.p_light)) {
+        return SpectrumSample(0.0f);
+    }
+    if (ls.light_type == LightType::AREA) {
+        float p_b = bsdf.pdf(wo, wi);
+        float w_l = power_heuristic(1, p_l, 1, p_b);
+        return ls.spec * f * (w_l / p_l);
+    }
+    else {
+        return ls.spec * f / p_l;
+    }
 }
 
 void ProgressBar::display() {

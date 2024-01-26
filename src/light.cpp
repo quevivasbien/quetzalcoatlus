@@ -12,7 +12,8 @@ std::optional<LightSample> PointLight::sample(const Pt3& p, const WavelengthSamp
         .spec = spec,
         .wi = wi,
         .pdf = 1.0f,
-        .p_light = m_point
+        .p_light = m_point,
+        .light_type = LightType::POINT
     };
 }
 
@@ -37,7 +38,8 @@ std::optional<LightSample> AreaLight::sample(const Pt3& p, const WavelengthSampl
         .spec = spec,
         .wi = wi,
         .pdf = ss.pdf,
-        .p_light = ss.p
+        .p_light = ss.p,
+        .light_type = LightType::AREA
     };
 }
 
