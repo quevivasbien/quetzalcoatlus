@@ -53,7 +53,7 @@ public:
     bool ready() const { return m_ready; }
 
     // intersect a single ray with the scene
-    std::optional<SurfaceInteraction> ray_intersect(const Ray& ray, const WavelengthSample& wavelengths, Sampler& sampler) const;
+    std::optional<SurfaceInteraction> ray_intersect(const Ray& ray, float t_max = std::numeric_limits<float>::infinity()) const;
 
     // sample illumination from lights at a given point
     std::pair<const Light*, float> sample_lights(const Pt3& point, Sampler& sampler) const;

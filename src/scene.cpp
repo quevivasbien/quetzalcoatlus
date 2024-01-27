@@ -60,12 +60,11 @@ RTCRayHit create_rayhit(const Ray& ray, RTCScene scene) {
 
 std::optional<SurfaceInteraction> Scene::ray_intersect(
     const Ray& ray,
-    const WavelengthSample& wavelengths,
-    Sampler& sampler
+    float t_max
 ) const {
     auto rayhit = create_rayhit(ray, m_scene);
 
-    if (rayhit.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
+    if (rayhit.hit.geomID == RTC_INVALID_GEOMETRY_ID || rayhit.ray.tfar > t_max) {
         return std::nullopt;
     }
 

@@ -250,7 +250,7 @@ PixelSample Renderer::sample_pixel(
     Vec3 last_normal;
 
     while (!weight.is_zero()) {
-        auto si_opt = scene.ray_intersect(ray, wavelengths, sampler);
+        auto si_opt = scene.ray_intersect(ray);
         if (!si_opt) {
             add_bg_light(pxs.color, scene, weight, wavelengths);
             break;
@@ -359,7 +359,7 @@ PixelSample Renderer::sample_pixel_with_media(
     Vec3 last_normal;
 
     while (!weight.is_zero()) {
-        auto si = scene.ray_intersect(ray, wavelengths, sampler);
+        auto si = scene.ray_intersect(ray);
         if (ray.medium) {
             // handle scattered rays
             bool scattered = false;
@@ -406,8 +406,9 @@ PixelSample Renderer::sample_pixel_with_media(
                             pxs.color += sample_direct_lighting_with_media(
                                 intr,
                                 wavelengths,
+                                r_u,
                                 sampler
-                            ) * weight * r_u;
+                            ) * weight;
                             // sample new direction
                             auto ps_opt = intr.phase.sample(-ray.d, sampler.sample_2d());
                             if (!ps_opt || ps_opt->pdf == 0.0f) {
@@ -499,7 +500,7 @@ PixelSample Renderer::sample_pixel_with_media(
         
         if (!bsdf->is_specular()) {
             // sample direct illumination from light sources
-            pxs.color += weight * sample_direct_lighting_with_media(*si, *bsdf, wavelengths, sampler);
+            pxs.color += weight * sample_direct_lighting_with_media(*si, *bsdf, wavelengths, r_u,sampler);
         }
 
         last_p = si->point;
@@ -581,6 +582,152 @@ SpectrumSample Renderer::sample_direct_lighting(
     else {
         return ls.spec * f / p_l;
     }
+}
+
+// helper for sample_direct_lighting_with_media methods
+SpectrumSample ray_through_media_to_light(
+    Ray light_ray,
+    const LightSample& ls,
+    float p_l,
+    const Scene& scene,
+    const WavelengthSample& wavelengths,
+    const SpectrumSample& f_hat,
+    float scatter_pdf,
+    const SpectrumSample& r_p
+) {
+    SpectrumSample t_ray(0.0f);
+    SpectrumSample r_l(1.0f);
+    SpectrumSample r_u(1.0f);
+    
+    std::mt19937 rng(hash(light_ray.o) + hash(light_ray.d));
+    std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+    while (!light_ray.d.is_zero()) {
+        auto si_ = scene.ray_intersect(light_ray, 0.9999f);
+        if (si_ && si_->material) {
+            // opaque surface between current point and light
+            return SpectrumSample(0.0f);
+        }
+        if (light_ray.medium) {
+            float t_max = si_ ? si_->t : 0.9999f;
+            float u = dist(rng);
+            SpectrumSample t_maj = sample_majorant(
+                light_ray,
+                t_max,
+                u,
+                rng,
+                wavelengths,
+                [&](Pt3 p, const MediumSample& ms, const SpectrumSample& maj_val, const SpectrumSample& t_maj) {
+                    // update ray transmittance estimate at sampled point
+                    SpectrumSample null_val = (maj_val - ms.absorption - ms.scattering).map([](float x) { return std::max(0.0f, x); });
+                    float pdf = t_maj[0] * maj_val[0];
+                    t_ray *= t_maj * null_val / pdf;
+                    r_l *= t_maj * maj_val / pdf;
+                    r_u *= t_maj * null_val / pdf;
+                    // possibly terminate via russian roullete
+                    SpectrumSample tr = t_ray / (r_l + r_u).average();
+                    if (tr.max_component() < 0.05f) {
+                        float q = 0.75f;
+                        if (dist(rng) < q) {
+                            t_ray = SpectrumSample(0.0f);
+                        }
+                        else {
+                            t_ray /= 1.0f - q;
+                        }
+                    }
+                    return true;
+                }
+            );
+            t_ray *= t_maj / t_maj[0];
+            r_l *= t_maj / t_maj[0];
+            r_u *= t_maj / t_maj[0];
+        }
+        if (t_ray.is_zero()) {
+            return SpectrumSample(0.0f);
+        }
+        if (!si_) {
+            break;
+        }
+        Vec3 rd = ls.p_light - si_->point;
+        light_ray = Ray(si_->point, rd, si_->get_medium(rd));
+    }
+
+    r_l *= r_p * p_l;
+    r_u *= r_p * scatter_pdf;
+    if (ls.light_type == LightType::AREA) {
+        return f_hat * t_ray * ls.spec / (r_l + r_u).average();
+    }
+    else {
+        return f_hat * t_ray * ls.spec / r_l.average();
+    }
+}
+
+SpectrumSample Renderer::sample_direct_lighting_with_media(
+    const SurfaceInteraction& si,
+    const BSDF& bsdf,
+    const WavelengthSample& wavelengths,
+    const SpectrumSample& r_p,
+    Sampler& sampler
+) {
+    auto sample_opt = sample_lights(si.point, wavelengths, sampler);
+    if (!sample_opt) {
+        return SpectrumSample(0.0f);
+    }
+    auto [ls, p_l] = *sample_opt;
+
+    Vec3 wo = si.wo;
+    Vec3 wi = ls.wi;
+    auto f_hat = bsdf(wo, wi) * std::abs(wi.dot(si.normal));
+    float scatter_pdf = bsdf.pdf(wo, wi);
+
+    if (f_hat.is_zero()) {
+        return SpectrumSample(0.0f);
+    }
+    Vec3 rd = ls.p_light - si.point;
+    Ray light_ray(si.point, rd, si.get_medium(rd));
+
+    return ray_through_media_to_light(
+        light_ray,
+        ls,
+        p_l,
+        scene,
+        wavelengths,
+        f_hat,
+        scatter_pdf,
+        r_p
+    );
+}
+
+SpectrumSample Renderer::sample_direct_lighting_with_media(
+    const MediumInteraction& mi,
+    const WavelengthSample& wavelengths,
+    const SpectrumSample& r_p,
+    Sampler& sampler
+) {
+    auto sample_opt = sample_lights(mi.point, wavelengths, sampler);
+    if (!sample_opt) {
+        return SpectrumSample(0.0f);
+    }
+    auto [ls, p_l] = *sample_opt;
+
+    float scatter_pdf = mi.phase(mi.wo, ls.wi);
+    SpectrumSample f_hat(scatter_pdf);
+
+    if (f_hat.is_zero()) {
+        return SpectrumSample(0.0f);
+    }
+    Vec3 rd = ls.p_light - mi.point;
+    Ray light_ray(mi.point, rd, mi.medium);
+
+    return ray_through_media_to_light(
+        light_ray,
+        ls,
+        p_l,
+        scene,
+        wavelengths,
+        f_hat,
+        scatter_pdf,
+        r_p
+    );
 }
 
 void ProgressBar::display() {

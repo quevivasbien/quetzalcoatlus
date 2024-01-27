@@ -81,51 +81,18 @@ private:
         const SurfaceInteraction& si,
         const BSDF& bsdf,
         const WavelengthSample& wavelengths,
+        const SpectrumSample& r_p,
         Sampler& sampler
-    ) {
-        auto sample_opt = sample_lights(si.point, wavelengths, sampler);
-        if (!sample_opt) {
-            return SpectrumSample(0.0f);
-        }
-        auto [ls, p_l] = *sample_opt;
-
-        Vec3 wo = si.wo;
-        Vec3 wi = ls.wi;
-        auto f_hat = bsdf(wo, wi) * std::abs(wi.dot(si.normal));
-        if (f_hat.is_zero()) {
-            return SpectrumSample(0.0f);
-        }
-        Vec3 rd = (ls.p_light - si.point).normalized();
-        Ray light_ray(si.point, rd, si.get_medium(rd));
-
-        SpectrumSample t_ray(0.0f);
-        SpectrumSample r_l(1.0f);
-        SpectrumSample r_u(1.0f);
-        
-        while (!light_ray.d.is_zero()) {
-            
-        }
-
-        // todo!
-        return SpectrumSample(0.0f);
-    }
+    );
 
 
     // sample direct lighting at the site of a medium interaction
     SpectrumSample sample_direct_lighting_with_media(
         const MediumInteraction& mi,
         const WavelengthSample& wavelengths,
+        const SpectrumSample& r_p,
         Sampler& sampler
-    ) {
-        auto sample_opt = sample_lights(mi.point, wavelengths, sampler);
-        if (!sample_opt) {
-            return SpectrumSample(0.0f);
-        }
-        auto [ls, p_l] = *sample_opt;
-
-        // todo!
-        return SpectrumSample(0.0f);
-    }
+    );
 
     const Camera& camera;
     const Scene& scene;
