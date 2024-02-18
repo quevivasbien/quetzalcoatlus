@@ -47,6 +47,11 @@ int main(int argc, const char* const argv[]) {
     std::string material_type = parser.get<std::string>("m");
     bool render_background = !parser.has("nobg");
     std::string light_type = parser.get<std::string>("light");
+
+    if (!parser.check()) {
+        parser.printErrors();
+        return 1;
+    }
     
     std::unique_ptr<Material> material;
     if (material_type == "diffuse") {
@@ -66,17 +71,12 @@ int main(int argc, const char* const argv[]) {
         return 1;
     }
 
-    if (!parser.check()) {
-        parser.printErrors();
-        return 1;
-    }
-
     Scene scene(initialize_device());
 
     // auto light_spectrum = std::make_shared<RGBIlluminantSpectrum>(RGB(3.0, 1.0, 2.0));
     auto light_spectrum = spectra::ILLUM_D65();
     if (light_type == "ambient") {
-        scene.set_bg_light(light_spectrum, 0.2f);
+        scene.set_bg_light(light_spectrum, 6.f);
     }
     else if (light_type == "point") {
         scene.add_light(std::make_unique<PointLight>(
@@ -100,7 +100,9 @@ int main(int argc, const char* const argv[]) {
         std::cerr << "Unknown light type: " << light_type << std::endl;
         return 1;
     }
-    
+
+    HomogeneousMedium medium(std::make_shared<ConstantSpectrum>(0.1), std::make_shared<ConstantSpectrum>(0.0), 0.1);
+    MediumInterface medium_interface { .inside = nullptr, .outside = &medium };
 
     Transform transform =
         Transform::translation(position)
@@ -108,19 +110,21 @@ int main(int argc, const char* const argv[]) {
         * Transform::rotate_y(rotation.y)
         * Transform::rotate_z(rotation.z)
         * Transform::scale(scale);
-    scene.add_obj(filename, material.get(), std::nullopt, transform);
+    scene.add_obj(filename, material.get(), medium_interface, transform);
 
     DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));
     if (render_background) {
         scene.add_plane(
             Pt3(0., -0.1, 0.),
             Vec3(0., 1., 0.),
-            &floor
+            &floor,
+            medium_interface
         );
         scene.add_plane(
             Pt3(0., 0., -5.),
             Vec3(0., 0., 1.),
-            &floor
+            &floor,
+            medium_interface
         );
     }
 
@@ -131,6 +135,7 @@ int main(int argc, const char* const argv[]) {
         Transform::translation(0., 4., 6.)
         * Transform::rotate_x(-M_PI / 8.0)
     );
+    camera.medium = &medium;
 
     auto result = render(camera, scene, n_samples, max_bounces);
 

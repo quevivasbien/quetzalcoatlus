@@ -186,11 +186,48 @@ void add_bg_light(
     SpectrumSample& color,
     const Scene& scene,
     const SpectrumSample& weight,
-    const WavelengthSample& wavelengths
+    const WavelengthSample& wavelengths,
+    size_t depth,
+    bool specular_bounce,
+    float p_b
 ) {
     auto bg_light = scene.get_bg_light();
-    if (bg_light.spectrum) {
-        color += weight * SpectrumSample::from_spectrum(*bg_light.spectrum, wavelengths) * bg_light.scale;
+    if (!bg_light.spectrum) {
+        return;
+    }
+    auto emitted = weight * SpectrumSample::from_spectrum(*bg_light.spectrum, wavelengths) * bg_light.scale;
+    if (depth == 0 || specular_bounce) {
+        color += weight * emitted;
+    }
+    else {
+        // if bg lights are implemented in a more sophisticated way, this will need to change
+        float w_l = power_heuristic(1, p_b, 1, 1.0f);
+        color += weight * emitted * w_l;
+    }
+}
+
+void add_bg_light(
+    SpectrumSample& color,
+    const Scene& scene,
+    const SpectrumSample& weight,
+    const WavelengthSample& wavelengths,
+    size_t depth,
+    bool specular_bounce,
+    const SpectrumSample& r_u,
+    const SpectrumSample& r_l
+) {
+    auto bg_light = scene.get_bg_light();
+    if (!bg_light.spectrum) {
+        return;
+    }
+    auto emitted = weight * SpectrumSample::from_spectrum(*bg_light.spectrum, wavelengths) * bg_light.scale;
+    if (depth == 0 || specular_bounce) {
+        color += weight * emitted / r_u.average();
+    }
+    else {
+        // if bg lights are implemented in a more sophisticated way, this will need to change
+        // so the r_l is updated here
+        color += weight * emitted / (r_u + r_l).average();
     }
 }
 
@@ -252,7 +289,7 @@ PixelSample Renderer::sample_pixel(
     while (!weight.is_zero()) {
         auto si_opt = scene.ray_intersect(ray);
         if (!si_opt) {
-            add_bg_light(pxs.color, scene, weight, wavelengths);
+            add_bg_light(pxs.color, scene, weight, wavelengths, depth, specular_bounce, p_b);
             break;
         }
         
@@ -368,17 +405,25 @@ PixelSample Renderer::sample_pixel_with_media(
             // initialize rng for transmittance
             std::mt19937 rng(hash(sampler.sample_1d()));
             std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-            auto maj = sample_majorant(
+            auto t_maj = sample_majorant(
                 ray,
                 t_max,
                 sampler.sample_1d(),
                 rng,
                 wavelengths,
-                [&](Pt3 p, const MediumSample& ms, const SpectrumSample& maj_val, const SpectrumSample& maj) {
+                [&](Pt3 p, const MediumSample& ms, const SpectrumSample& maj_val, const SpectrumSample& t_maj) {
                     // handle scattering event
+                    if (weight.is_zero()) {
+                        terminated = true;
+                        return false;
+                    }
+                    
+                    // if medium emission is added as a feature, it goes here
+
                     float p_absorption = ms.absorption[0] / maj_val[0];
                     float p_scattering = ms.scattering[0] / maj_val[0];
                     float p_null = std::max(0.0f, 1.0f - p_absorption - p_scattering);
+
                     float u = dist(rng);
                     int mode = Sampler::sample_discrete(u, {p_absorption, p_scattering, p_null});
                     if (mode == 0) {
@@ -392,9 +437,10 @@ PixelSample Renderer::sample_pixel_with_media(
                             terminated = true;
                             return false;
                         }
-                        float pdf = maj[0] * ms.scattering[0];
-                        weight *= maj * ms.scattering / pdf;
-                        r_u *= maj * ms.scattering / pdf;
+                        depth++;
+                        float pdf = t_maj[0] * ms.scattering[0];
+                        weight *= t_maj * ms.scattering / pdf;
+                        r_u *= t_maj * ms.scattering / pdf;
                         if (!weight.is_zero() && !r_u.is_zero()) {
                             MediumInteraction intr {
                                 .point = p,
@@ -415,7 +461,7 @@ PixelSample Renderer::sample_pixel_with_media(
                                 terminated = true;
                             }
                             else {
-                                auto ps = *ps_opt;
+                                const auto& ps = *ps_opt;
                                 // weight *= ps.pdf / ps.pdf;  // not necessary since I've only implemented the HG phase func
                                 r_l = r_u / ps.pdf;
                                 last_p = p;
@@ -427,19 +473,18 @@ PixelSample Renderer::sample_pixel_with_media(
                                 any_nonspecular_bounce = true;
                             }
                         }
-                        depth++;
                         return false;
                     }
                     else {
                         // handle null event
                         auto null_value = (maj_val - ms.absorption - ms.scattering).map([](float v) { return std::max(0.0f, v); });
-                        float pdf = maj[0] * null_value[0];
-                        weight *= maj * null_value / pdf;
+                        float pdf = t_maj[0] * null_value[0];
+                        weight *= t_maj * null_value / pdf;
                         if (pdf == 0.0f) {
                             weight = SpectrumSample(0.0f);
                         }
-                        r_u *= maj * null_value / pdf;
-                        r_l *= maj * maj_val / pdf;
+                        r_u *= t_maj * null_value / pdf;
+                        r_l *= t_maj * maj_val / pdf;
                         return !(weight.is_zero() || r_u.is_zero());
                     }
                 }
@@ -459,7 +504,7 @@ PixelSample Renderer::sample_pixel_with_media(
         // handle unscattered rays
         if (!si) {
             // no intersection, add background and break
-            add_bg_light(pxs.color, scene, weight, wavelengths);
+            add_bg_light(pxs.color, scene, weight, wavelengths, depth, specular_bounce, r_u, r_l);
             break;
         }
         if (depth == 0) {
