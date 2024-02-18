@@ -17,3 +17,7 @@ target_include_directories(textures PRIVATE ${CMAKE_SOURCE_DIR}/src)
 add_executable(mandelbrot mandelbrot.cpp)
 target_link_libraries(mandelbrot PRIVATE lib color)
 target_include_directories(mandelbrot PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+add_executable(glass_spheres glass_spheres.cpp)
+target_link_libraries(glass_spheres PRIVATE lib color)
+target_include_directories(glass_spheres PRIVATE ${CMAKE_SOURCE_DIR}/src)

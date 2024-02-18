@@ -87,13 +87,14 @@ int main(int argc, const char* const argv[]) {
     }
     else if (light_type == "area") {
         scene.add_light(std::make_unique<AreaLight>(
-            std::make_unique<Quad>(
-                Pt3(4., 6., 8.),
-                Vec3(-0.5, 0., 0.5),
-                Vec3(0., 0.75, 0.)
-            ),
+            // std::make_unique<Quad>(
+            //     Pt3(4., 6., 8.),
+            //     Vec3(-0.5, 0., 0.5),
+            //     Vec3(0., 0.75, 0.)
+            // ),
+            std::make_unique<Sphere>(Pt3(4., 6., 8.), 1.0),
             light_spectrum,
-            14.0f
+            12.0f
         ));
     }
     else {
@@ -110,7 +111,7 @@ int main(int argc, const char* const argv[]) {
         * Transform::scale(scale);
     scene.add_obj(filename, material.get(), transform);
 
-    DiffuseMaterial floor(SolidColor(1.0, 0.4, 0.9));
+    DiffuseMaterial floor(SolidColor(1.0, 0.1, 0.9));
     if (render_background) {
         scene.add_plane(
             Pt3(0., -0.1, 0.),
