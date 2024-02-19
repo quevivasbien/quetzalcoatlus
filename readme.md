@@ -1,6 +1,14 @@
 # quetzalcoatlus
 
-This is a hobby raytracer, inspired by the [Raytracing in One Weekend series](https://raytracing.github.io/) and [PBRT](https://pbr-book.org/4ed/contents).
+This is a hobby raytracer, inspired by [PBRTv4](https://pbr-book.org/4ed/contents). Features include:
+
+- Spectral color
+- Diffuse, conductive (including anisotropic), dielectric, and mixed surfaces
+- Homogeneous media (in progress)
+- Basic 3D geometries, including quad, triangle, and grid meshes
+- Parsing of Wavefront OBJ files
+- BVH and intersection checking via Intel Embree
+- Denoising with Intel OpenImageDenoise
 
 ## Sample images
 
